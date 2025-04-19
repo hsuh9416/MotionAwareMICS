@@ -16,8 +16,8 @@ class Config:
     num_classes = 100 # Total number of classes
     way = 5
     shots = 5
-    sessions = 9
-    Dataset = Dataset
+    sessions = 8  # 40 / 5 = 8 sessions
+    Dataset = Dataset # Pre-defined dataset class
 
     # Feature Extractor
     backbone = 'resnet20' # Feature Extractor
