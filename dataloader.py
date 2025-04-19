@@ -1,14 +1,57 @@
+# MIT License
+#
+# Copyright (c) 2023 Solang Kim
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+# This function is based on the code from https://github.com/solangii/MICS
+# with modifications to adapt it to the Motion-Aware MICS implementation
+
 # Import necessary libraries
 import torch
 import torchvision
 import torchvision.transforms as transforms
-from sklearn.decomposition import PCA
 from torch.utils.data import Subset, Dataset
 from config import Config
 
-# CIFAR-100 데이터셋 로드 및 전처리 함수
 def load_cifar100(base_classes, novel_classes_per_session, num_sessions):
-    # 데이터 증강 및 전처리
+    """
+    Load and preprocess CIFAR-100 dataset for Few-Shot Class Incremental Learning (FSCIL).
+    This function divides the dataset into base session and incremental sessions based on the given parameters.
+
+    Original source: https://github.com/solangii/MICS/blob/main/dataloader.py
+    MIT License, Copyright (c) 2023 Solang Kim
+
+    Modifications:
+    - Adapted to work with the Config class parameters
+    - Reorganized for compatibility with Motion-Aware implementation
+    - Added documentation
+
+    Args:
+        base_classes (int): Number of classes for the base session
+        novel_classes_per_session (int): Number of new classes per incremental session
+        num_sessions (int): Number of incremental sessions
+
+    Returns:
+        tuple: (sessions_train_data, sessions_test_data) where each element is a list of datasets for each session
+    """
+    # Data augmentation and preprocessing for training
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
@@ -16,18 +59,19 @@ def load_cifar100(base_classes, novel_classes_per_session, num_sessions):
         transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
     ])
 
+    # Preprocessing for testing (no augmentation)
     transform_test = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
     ])
 
-    # 데이터셋 로드
+    # Load datasets
     trainset = torchvision.datasets.CIFAR100(root='./data', train=True,
-                                             download=True, transform=transform_train)
+                                           download=True, transform=transform_train)
     testset = torchvision.datasets.CIFAR100(root='./data', train=False,
-                                           download=True, transform=transform_test)
+                                          download=True, transform=transform_test)
 
-    # 클래스별 인덱스 생성
+    # Create indices by class
     train_indices = {i: [] for i in range(100)}
     for idx, (_, label) in enumerate(trainset):
         train_indices[label].append(idx)
@@ -36,11 +80,11 @@ def load_cifar100(base_classes, novel_classes_per_session, num_sessions):
     for idx, (_, label) in enumerate(testset):
         test_indices[label].append(idx)
 
-    # 세션별 데이터셋 준비
+    # Prepare datasets for each session
     sessions_train_data = []
     sessions_test_data = []
 
-    # 기본 세션 (base classes)
+    # Base session (with base_classes)
     base_train_indices = []
     for cls in range(base_classes):
         base_train_indices.extend(train_indices[cls])
@@ -52,19 +96,19 @@ def load_cifar100(base_classes, novel_classes_per_session, num_sessions):
     sessions_train_data.append(Subset(trainset, base_train_indices))
     sessions_test_data.append(Subset(testset, base_test_indices))
 
-    # 증분 세션 (novel classes)
+    # Incremental sessions (with novel classes)
     novel_start_class = base_classes
     for session in range(num_sessions):
         novel_end_class = novel_start_class + novel_classes_per_session
 
-        # 각 클래스에서 K-shot 샘플 선택
+        # Select K-shot samples for each class in incremental session
         inc_train_indices = []
         for cls in range(novel_start_class, novel_end_class):
-            # 각 클래스에서 shots_per_class 개의 샘플만 선택
+            # Select only shots_per_class samples from each class
             selected_indices = train_indices[cls][:Config.shots_per_class]
             inc_train_indices.extend(selected_indices)
 
-        # 테스트 셋은 모든 샘플 사용
+        # Use all samples for testing
         inc_test_indices = []
         for cls in range(novel_start_class, novel_end_class):
             inc_test_indices.extend(test_indices[cls])
@@ -75,50 +119,6 @@ def load_cifar100(base_classes, novel_classes_per_session, num_sessions):
         novel_start_class = novel_end_class
 
     return sessions_train_data, sessions_test_data
-
-
-# Kinetics-400 데이터셋의 서브셋을 사용 (모션 인식 실험용)
-# 실제로는 TorchVision의 내장 데이터셋을 사용하는 것이 좋지만,
-# 여기서는 간략화를 위해 샘플 코드만 제공
-class KineticsSubset(Dataset):
-    def __init__(self, root_dir, subset='train', transform=None, num_classes=51, num_clips=5):
-        """
-        실제 구현에서는 torchvision.datasets.Kinetics400을 사용하는 것이 좋습니다.
-        여기서는 개념적인 구현만 제공합니다.
-        """
-        self.root_dir = root_dir
-        self.subset = subset
-        self.transform = transform
-        self.num_classes = num_classes
-        self.num_clips = num_clips
-        self.samples = self._load_samples()
-
-    def _load_samples(self):
-        # 실제 구현에서는 데이터셋 파일 경로를 로드합니다
-        # 여기서는 더미 데이터를 생성합니다
-        samples = []
-        for cls in range(self.num_classes):
-            for clip in range(self.num_clips):
-                samples.append((f"dummy_path_{cls}_{clip}.mp4", cls))
-        return samples
-
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, idx):
-        path, label = self.samples[idx]
-
-        # 실제 구현에서는 비디오를 로드하고 프레임을 추출합니다
-        # 여기서는 더미 텐서를 생성합니다 (3채널, 16프레임, 112x112 해상도)
-        video = torch.rand(3, 16, 112, 112)
-
-        if self.transform:
-            # 각 프레임에 transform 적용
-            frames = [self.transform(video[:, i]) for i in range(video.shape[1])]
-            video = torch.stack(frames, dim=1)
-
-        return video, label
-
 
 # UCF101 데이터셋 로드 (TorchVision 내장 기능 사용)
 def load_ucf101(base_classes, novel_classes_per_session, num_sessions, shots_per_class):

@@ -25,8 +25,7 @@ def set_seed(seed=42):
 
 # Function to execute the entire MICS algorithm
 def run_mics(config):
-    # load dataset
-    if config.dataset == 'cifar100': # CIFAR-100
+    if config.dataset == 'cifar100':  # CIFAR-100
         sessions_train_data, sessions_test_data = load_cifar100(
             config.base_classes,
             config.novel_classes_per_session,
@@ -40,16 +39,16 @@ def run_mics(config):
             config.shots_per_class
         )
 
-    # Create dataloader
+    # Create dataloaders with the configured batch size and worker count
     train_loaders = [
         DataLoader(dataset, batch_size=config.batch_size, shuffle=True,
-                  num_workers=config.num_workers)
+                  num_workers=config.num_workers, pin_memory=True)
         for dataset in sessions_train_data
     ]
 
     test_loaders = [
         DataLoader(dataset, batch_size=config.batch_size, shuffle=False,
-                  num_workers=config.num_workers)
+                  num_workers=config.num_workers, pin_memory=True)
         for dataset in sessions_test_data
     ]
 
