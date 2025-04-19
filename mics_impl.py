@@ -172,9 +172,8 @@ def compute_optical_flow(frames):
                 next_gray = cv2.cvtColor(next_frame, cv2.COLOR_RGB2GRAY)
 
                 # Compute flow
-                flow = cv2.calcOpticalFlowFarneback(
-                    prev_gray, next_gray, None, 0.5, 3, 15, 3, 5, 1.2, 0
-                )
+                flow = cv2.calcOpticalFlowFarneback(prev_gray, next_gray, flow=None, pyr_scale=0.5, levels=3,
+                                                    winsize=15, iterations=3, poly_n=5, poly_sigma=1.2, flags=0)
 
                 # Store flow
                 flows[b, 0, t] = torch.from_numpy(flow[:, :, 0]).to(frames.device)
@@ -182,6 +181,5 @@ def compute_optical_flow(frames):
 
             except Exception as e:
                 print(f"Error computing optical flow: {e}")
-                # Use zero flow as fallback
 
     return flows

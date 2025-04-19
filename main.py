@@ -4,7 +4,7 @@ import shutil
 import random
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
+import torch.nn as nn
 
 # Import user-defined modules
 from config import Config
@@ -26,71 +26,68 @@ def set_seed(seed=42):
 
 
 # Function to execute the entire MICS algorithm
-def run_mics(config, session):
-    # Load appropriate dataset
-    sessions_train_data, sessions_test_data = get_dataloader(config, session)
-
-    # Create dataloaders with the configured batch size and worker count
-    train_loaders = [
-        DataLoader(dataset, batch_size=config.batch_size, shuffle=True,
-                   num_workers=config.num_workers, pin_memory=True)
-        for dataset in sessions_train_data
-    ]
-
-    test_loaders = [
-        DataLoader(dataset, batch_size=config.batch_size, shuffle=False,
-                   num_workers=config.num_workers, pin_memory=True)
-        for dataset in sessions_test_data
-    ]
-
+def run_mics(config):
     # Initialize model with base classes
     model = MICS(config, config.base_classes).to(config.device)
-
-    # Base session Training
-    print("Training base session...")
-    model = train_base(model, train_loaders[0], config)
 
     # Base session Evaluation
     current_classes = config.base_classes
     acc_history = []
     nVar_history = []
 
+    # Base session Training
+    print("Training base session...")
+
+    # Load base dataset
+    trainset, trainloader, testloader = get_dataloader(config, 0)
+    model = train_base(model, trainloader, config)
+
     # Evaluate base session
-    acc_per_session = evaluate(model, [test_loaders[0]], config)
+    acc_per_session = evaluate(model, [testloader], config)
     acc_history.extend(acc_per_session)
 
-    nVar = compute_nVar(model, [test_loaders[0]], current_classes, config)
+    nVar = compute_nVar(model, [testloader], current_classes, config)
     nVar_history.append(nVar)
 
     # Visualize base session
-    visualize_pca(model, [test_loaders[0]], current_classes, config, 0)
+    visualize_pca(model, [testloader], current_classes, config, 0)
 
     # Process each incremental session
     for session_idx in range(1, config.num_sessions + 1):
-        if session_idx < len(train_loaders):
-            print(f"\nTraining incremental session {session_idx}...")
+        print(f"\nTraining incremental session {session_idx}...")
 
-            # Expand classifier for new classes
-            novel_classes = config.novel_classes_per_session
-            model.expand_classifier(novel_classes)
-            current_classes += novel_classes
+        # load incremental dataset
+        trainset, trainloader, testloader = get_dataloader(config, session_idx)
 
-            # Incremental Session Training
-            model = train_inc(
-                model, train_loaders[session_idx], session_idx, current_classes, config
-            )
+        # Create list of all test loaders up to current session for evaluation
+        test_loaders = []
+        for s in range(session_idx + 1):
+            _, _, testloader_s = get_dataloader(config, s)
+            test_loaders.append(testloader_s)
 
-            # Evaluation of all sessions up to current
-            acc_per_session = evaluate(model, test_loaders[:session_idx + 1], config)
-            acc_history.append(acc_per_session[-1])  # Store final session accuracy
+        # Expand classifier for new classes
+        novel_classes = config.way  # Number of new classes per session
+        expanded_classifiers = nn.Parameter(
+            torch.cat([
+                model.classifiers.data,
+                torch.randn(novel_classes, config.feature_dim).to(config.device)
+            ], dim=0)
+        )
+        model.classifiers = expanded_classifiers
+        current_classes += novel_classes
 
-            nVar = compute_nVar(model, test_loaders[:session_idx + 1], current_classes, config)
-            nVar_history.append(nVar)
+        # Incremental session training
+        model = train_inc(model, trainloader, session_idx, current_classes, config)
 
-            # Visualization
-            visualize_pca(model, test_loaders[:session_idx + 1], current_classes, config, session_idx)
-        else:
-            print(f"Skipping session {session_idx} - no data available")
+        # Evaluate on all classes seen so far
+        acc_per_session = evaluate(model, test_loaders, config)
+        acc_history.append(acc_per_session[-1])  # Store accuracy for current session
+
+        nVar = compute_nVar(model, test_loaders, current_classes, config)
+        nVar_history.append(nVar)
+
+        # Visualize feature space
+        visualize_pca(model, test_loaders, current_classes, config, session_idx)
 
     return model, nVar_history, acc_history
 
