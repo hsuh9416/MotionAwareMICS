@@ -28,7 +28,7 @@ def train_base(model, train_loader, config):
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.base_epochs)
 
     # Initialize gradient scaler for mixed precision training
-    scaler = GradScaler()  # Fix: removed the 'cuda' parameter
+    scaler = GradScaler('cuda')
 
     for epoch in range(config.base_epochs):
         model.train()
@@ -46,7 +46,7 @@ def train_base(model, train_loader, config):
             optimizer.zero_grad()
 
             # Regular training first
-            with autocast():
+            with autocast('cuda'):
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
 
@@ -70,7 +70,7 @@ def train_base(model, train_loader, config):
                         x2, y2 = inputs_b[i:i + 1], targets_b[i:i + 1]
 
                         # Apply manifold mixup
-                        with autocast():
+                        with autocast('cuda'):
                             mixed_features, mixed_targets = model.manifold_mixup(
                                 x1, x2, y1, y2, 0
                             )
@@ -79,7 +79,7 @@ def train_base(model, train_loader, config):
 
                     # Process all mixup samples together
                     if batch_mixed_features:
-                        with autocast():
+                        with autocast('cuda'):
                             mixed_features_tensor = torch.cat(batch_mixed_features, dim=0)
                             mixed_targets_tensor = torch.stack(batch_mixed_labels, dim=0)
 
@@ -140,7 +140,7 @@ def train_inc(model, train_loader, session_idx, current_classes, config):
     criterion = nn.CrossEntropyLoss()
 
     # Initialize gradient scaler for mixed precision training
-    scaler = GradScaler()  # Fix: removed the 'cuda' parameter
+    scaler = GradScaler('cuda')
 
     # Store original classifier data for stability
     original_classifier_data = model.classifiers.data[:current_classes - config.novel_classes_per_session].clone()
@@ -189,7 +189,7 @@ def train_inc(model, train_loader, session_idx, current_classes, config):
             optimizer.zero_grad()
 
             # Regular training
-            with autocast():
+            with autocast('cuda'):
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
 
@@ -212,7 +212,7 @@ def train_inc(model, train_loader, session_idx, current_classes, config):
                         x2, y2 = inputs_b[i:i + 1], targets_b[i:i + 1]
 
                         # Apply manifold mixup
-                        with autocast():
+                        with autocast('cuda'):
                             mixed_features, mixed_targets = model.manifold_mixup(
                                 x1, x2, y1, y2, session_idx
                             )
@@ -221,7 +221,7 @@ def train_inc(model, train_loader, session_idx, current_classes, config):
 
                     # Process all mixup samples together
                     if batch_mixed_features:
-                        with autocast():
+                        with autocast('cuda'):
                             mixed_features_tensor = torch.cat(batch_mixed_features, dim=0)
                             mixed_targets_tensor = torch.stack(batch_mixed_labels, dim=0)
 
