@@ -101,7 +101,7 @@ def run_mics(config):
 # Main function
 def main():
     # Set seed
-    set_seed(42)
+    set_seed(1)
 
     # Call pre-set config
     config = Config()
