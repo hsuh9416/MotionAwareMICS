@@ -151,10 +151,10 @@ def load_ucf101(base_classes, novel_classes_per_session, num_sessions, shots_per
     ])
 
     # Load UCF101 dataset
-    trainset = torchvision.datasets.UCF101(root='./data', annotation_path='ucfTrainTestlist',
+    trainset = torchvision.datasets.UCF101(root='/content/drive/MyDrive/MotionAwareMICS/data', annotation_path='ucfTrainTestlist',
                                            frames_per_clip=16, step_between_clips=8,
                                            fold=1, train=True, transform=transform_train)
-    testset = torchvision.datasets.UCF101(root='./data', annotation_path='ucfTrainTestlist',
+    testset = torchvision.datasets.UCF101(root='/content/drive/MyDrive/MotionAwareMICS/data', annotation_path='ucfTrainTestlist',
                                           frames_per_clip=16, step_between_clips=8,
                                           fold=1, train=False, transform=transform_test)
 
