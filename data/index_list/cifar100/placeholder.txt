@@ -1,0 +1,1 @@
+This folder contains index information related to CIFAR-100. Please note that it was not uploaded due to size limitations.
