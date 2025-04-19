@@ -30,6 +30,9 @@ def train_base(model, train_loader, config):
     # Initialize gradient scaler for mixed precision training
     scaler = GradScaler()
 
+    # Get device type for autocast
+    device_type = 'cuda' if torch.cuda.is_available() else 'cpu'
+
     for epoch in range(config.base_epochs):
         model.train()
         running_loss = 0.0
@@ -42,7 +45,7 @@ def train_base(model, train_loader, config):
             # Regular training on original samples
             optimizer.zero_grad()
 
-            with autocast('cuda'):
+            with autocast(device_type=device_type):  # Fixed: specify device_type
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
 
@@ -57,70 +60,56 @@ def train_base(model, train_loader, config):
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
 
-            # Apply mixup on a separate forward-backward pass (50% chance)
-            if np.random.random() < 0.5:
+            # Apply mixup on a separate pass
+            if np.random.random() < 0.5:  # 50% chance to apply mixup
                 # Create sample pairs
                 indices = torch.randperm(inputs.size(0)).to(config.device)
                 inputs_b, targets_b = inputs[indices], targets[indices]
 
-                # Find valid class pairs (different classes)
+                # Find valid pairs (different classes)
                 valid_pairs = []
-                for i in range(min(16, inputs.size(0))):  # Limit batch size for mixup
+                for i in range(min(16, inputs.size(0))):  # Limit to 16 samples
                     if targets[i] != targets_b[i]:
                         valid_pairs.append(i)
 
-                if valid_pairs:
-                    # Precompute total classes after all virtual classes
-                    # This is crucial for fixing the dimension mismatch
-                    potential_virtual_classes = len(valid_pairs)
-                    total_classes = len(model.classifiers) + potential_virtual_classes
-
-                    # Process all valid pairs in a single batch
-                    batch_mixed_features = []
-                    batch_mixed_labels = []
-
+                if len(valid_pairs) > 0:
+                    # Process one pair at a time to avoid dimension issues
                     for i in valid_pairs:
+                        optimizer.zero_grad()
+
                         x1, y1 = inputs[i:i + 1], targets[i:i + 1]
                         x2, y2 = inputs_b[i:i + 1], targets_b[i:i + 1]
 
-                        # Apply manifold mixup with fixed total_classes
-                        mixed_features, mixed_label = model.manifold_mixup(
-                            x1, x2, y1, y2, 0, total_classes
-                        )
+                        # Simplified mixup in feature space
+                        with autocast(device_type=device_type):  # Fixed: specify device_type
+                            # Extract features separately
+                            features1 = model(x1, return_features=True)
+                            features2 = model(x2, return_features=True)
 
-                        batch_mixed_features.append(mixed_features)
-                        batch_mixed_labels.append(mixed_label)
+                            # Sample mixing ratio
+                            alpha = config.alpha
+                            lam = np.random.beta(alpha, alpha)
 
-                    # Process all mixup samples together if we have any
-                    if batch_mixed_features:
-                        optimizer.zero_grad()
+                            # Mix features
+                            mixed_features = lam * features1 + (1 - lam) * features2
 
-                        with autocast('cuda'):
-                            # Concatenate all mixed features
-                            mixed_features_tensor = torch.cat(batch_mixed_features, dim=0)
+                            # Normalize mixed features
+                            mixed_features = F.normalize(mixed_features, p=2, dim=1)
 
-                            # Stack all mixed labels - now they should have consistent dimensions
-                            mixed_labels_tensor = torch.stack(batch_mixed_labels, dim=0)
-
-                            # Forward pass with mixed features
-                            # Ensure we're only using as many classifier weights as we have
-                            classifier_weights = F.normalize(
-                                model.classifiers[:total_classes], p=2, dim=1
-                            )
-
-                            logits = F.linear(
-                                F.normalize(mixed_features_tensor, p=2, dim=1),
-                                classifier_weights
-                            )
+                            # Get logits using only real classifiers (no virtual classes)
+                            real_classifiers = F.normalize(model.classifiers, p=2, dim=1)
+                            logits = F.linear(mixed_features, real_classifiers)
 
                             # Apply temperature scaling
-                            mixed_outputs = logits / config.temperature
+                            logits = logits / config.temperature
 
-                            # Compute KL divergence loss
-                            mixup_loss = -torch.sum(
-                                F.log_softmax(mixed_outputs, dim=1) * mixed_labels_tensor,
-                                dim=1
-                            ).mean()
+                            # Create soft labels (mix the two classes)
+                            soft_labels = torch.zeros_like(logits)
+                            soft_labels[0, y1.item()] = lam
+                            soft_labels[0, y2.item()] = 1 - lam
+
+                            # KL divergence loss
+                            mixup_loss = -torch.sum(F.log_softmax(logits, dim=1) * soft_labels)
 
                         # Scale and backward
                         scaler.scale(mixup_loss).backward()
@@ -132,12 +121,9 @@ def train_base(model, train_loader, config):
         scheduler.step()
 
         # Print progress
-        train_loss = running_loss / (len(train_loader) * 1.5)  # Adjust for extra mixup batches
+        train_loss = running_loss / len(train_loader)
         train_acc = 100. * correct / total
         print(f'Epoch: {epoch}, Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}%')
-
-    # Remove virtual classifiers after training
-    model.cleanup_virtual_classifiers(config.base_classes)
 
     return model
 
@@ -163,8 +149,12 @@ def train_inc(model, train_loader, session_idx, current_classes, config):
     # Initialize gradient scaler for mixed precision training
     scaler = GradScaler()
 
+    # Get device type for autocast
+    device_type = 'cuda' if torch.cuda.is_available() else 'cpu'
+
     # Store original classifier data for stability
-    original_classifier_data = model.classifiers.data[:current_classes - config.novel_classes_per_session].clone()
+    old_classes = current_classes - config.novel_classes_per_session
+    original_classifier_data = model.classifiers.data[:old_classes].clone()
 
     # Select parameters to update (those with small absolute values)
     backbone_params = []
@@ -193,7 +183,6 @@ def train_inc(model, train_loader, session_idx, current_classes, config):
 
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.inc_epochs)
 
-    # Training loop
     for epoch in range(config.inc_epochs):
         model.train()
         running_loss = 0.0
@@ -203,84 +192,88 @@ def train_inc(model, train_loader, session_idx, current_classes, config):
         for batch_idx, (inputs, targets) in enumerate(tqdm(train_loader)):
             inputs, targets = inputs.to(config.device), targets.to(config.device)
 
-            # Create sample pairs for mixup
-            indices = torch.randperm(inputs.size(0)).to(config.device)
-            inputs_b, targets_b = inputs[indices], targets[indices]
-
+            # Regular training
             optimizer.zero_grad()
 
-            # Regular training
-            with autocast('cuda'):
+            with autocast(device_type=device_type):  # Fixed: specify device_type
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
 
             # Scale gradients and perform backward pass
             scaler.scale(loss).backward()
-
-            # Apply mixup for some samples
-            if np.random.random() < 0.5:
-                valid_pairs = []
-                for i in range(min(inputs.size(0), 16)):  # Limit to avoid memory issues
-                    if targets[i] != targets_b[i]:
-                        valid_pairs.append(i)
-
-                if valid_pairs:
-                    batch_mixed_features = []
-                    batch_mixed_labels = []
-
-                    for i in valid_pairs:
-                        x1, y1 = inputs[i:i + 1], targets[i:i + 1]
-                        x2, y2 = inputs_b[i:i + 1], targets_b[i:i + 1]
-
-                        # Apply manifold mixup
-                        with autocast('cuda'):
-                            mixed_features, mixed_targets = model.manifold_mixup(
-                                x1, x2, y1, y2, session_idx
-                            )
-                            batch_mixed_features.append(mixed_features)
-                            batch_mixed_labels.append(mixed_targets)
-
-                    # Process all mixup samples together
-                    if batch_mixed_features:
-                        with autocast('cuda'):
-                            mixed_features_tensor = torch.cat(batch_mixed_features, dim=0)
-                            mixed_targets_tensor = torch.stack(batch_mixed_labels, dim=0)
-
-                            # Use features directly with classifier
-                            logits = F.linear(
-                                F.normalize(mixed_features_tensor, p=2, dim=1),
-                                F.normalize(model.classifiers, p=2, dim=1)
-                            )
-                            mixed_outputs = logits / config.temperature
-
-                            # KL divergence loss for soft labels
-                            mixup_loss = -torch.sum(
-                                F.log_softmax(mixed_outputs, dim=1) * mixed_targets_tensor,
-                                dim=1
-                            ).mean()
-
-                            # Scale and accumulate gradient
-                            scaler.scale(mixup_loss).backward()
-
-            # Update weights
             scaler.step(optimizer)
             scaler.update()
 
-            # Maintain stability of old class prototypes
-            with torch.no_grad():
-                # Apply regularization to prevent old classifiers from changing too much
-                old_classes = current_classes - config.novel_classes_per_session
-                regularization_strength = 0.9  # High value to preserve old knowledge
-                mixed_classifiers = (
-                        regularization_strength * original_classifier_data +
-                        (1 - regularization_strength) * model.classifiers.data[:old_classes]
-                )
-                model.classifiers.data[:old_classes] = mixed_classifiers
-
+            # Track metrics
             running_loss += loss.item()
             _, predicted = outputs.max(1)
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
+
+            # Apply mixup for some samples (similar simplified approach as in train_base)
+            if np.random.random() < 0.5:
+                # Create sample pairs
+                indices = torch.randperm(inputs.size(0)).to(config.device)
+                inputs_b, targets_b = inputs[indices], targets[indices]
+
+                # Find valid pairs (different classes)
+                valid_pairs = []
+                for i in range(min(inputs.size(0), 16)):  # Limit to 16 samples
+                    if targets[i] != targets_b[i]:
+                        valid_pairs.append(i)
+
+                if len(valid_pairs) > 0:
+                    # Process one pair at a time
+                    for i in valid_pairs:
+                        optimizer.zero_grad()
+
+                        x1, y1 = inputs[i:i + 1], targets[i:i + 1]
+                        x2, y2 = inputs_b[i:i + 1], targets_b[i:i + 1]
+
+                        with autocast(device_type=device_type):  # Fixed: specify device_type
+                            # Extract features
+                            features1 = model(x1, return_features=True)
+                            features2 = model(x2, return_features=True)
+
+                            # Mix features
+                            alpha = config.alpha
+                            lam = np.random.beta(alpha, alpha)
+                            mixed_features = lam * features1 + (1 - lam) * features2
+
+                            # Normalize
+                            mixed_features = F.normalize(mixed_features, p=2, dim=1)
+
+                            # Use only real classifiers
+                            real_classifiers = F.normalize(model.classifiers, p=2, dim=1)
+                            logits = F.linear(mixed_features, real_classifiers)
+
+                            # Apply temperature
+                            logits = logits / config.temperature
+
+                            # Create soft labels
+                            soft_labels = torch.zeros_like(logits)
+                            soft_labels[0, y1.item()] = lam
+                            soft_labels[0, y2.item()] = 1 - lam
+
+                            # KL divergence loss
+                            mixup_loss = -torch.sum(F.log_softmax(logits, dim=1) * soft_labels)
+
+                        # Scale and backward
+                        scaler.scale(mixup_loss).backward()
+                        scaler.step(optimizer)
+                        scaler.update()
+
+                        running_loss += mixup_loss.item()
+
+            # Maintain stability of old class prototypes (after each batch)
+            with torch.no_grad():
+                # Strong regularization to preserve old class knowledge
+                reg_strength = 0.9  # 90% old, 10% new updates
+                mixed_classifiers = (
+                        reg_strength * original_classifier_data +
+                        (1 - reg_strength) * model.classifiers.data[:old_classes]
+                )
+                model.classifiers.data[:old_classes] = mixed_classifiers
 
         scheduler.step()
 
@@ -290,11 +283,7 @@ def train_inc(model, train_loader, session_idx, current_classes, config):
         print(
             f'Incremental Session {session_idx}, Epoch: {epoch}, Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}%')
 
-    # Remove virtual classifiers after training
-    model.cleanup_virtual_classifiers(current_classes)
-
-    # Optional: Update classifier prototypes based on features (if enough samples)
-    # Only update new class prototypes, keep old ones stable
+    # Update classifier prototypes based on features
     if config.shots_per_class >= 5:  # Only if we have enough samples
         model.eval()
         class_features = {i: [] for i in range(current_classes)}
@@ -307,17 +296,17 @@ def train_inc(model, train_loader, session_idx, current_classes, config):
 
                 for i in range(inputs.size(0)):
                     class_idx = targets[i].item()
-                    class_features[class_idx].append(features[i])
+                    if class_idx < current_classes:  # Ensure valid class index
+                        class_features[class_idx].append(features[i])
 
-        # Update new class prototypes
-        old_classes = current_classes - config.novel_classes_per_session
+        # Update new class prototypes only
         for class_idx in range(old_classes, current_classes):
             if class_features[class_idx]:
-                # Calculate class centroid from features
+                # Compute centroid
                 class_prototype = torch.stack(class_features[class_idx]).mean(0)
-                # Normalize the prototype
+                # Normalize
                 class_prototype = F.normalize(class_prototype, p=2, dim=0)
-                # Update classifier
+                # Update
                 model.classifiers.data[class_idx] = class_prototype
 
     return model
