@@ -28,7 +28,7 @@ def train_base(model, train_loader, config):
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.base_epochs)
 
     # Initialize gradient scaler for mixed precision training
-    scaler = GradScaler('cuda')
+    scaler = GradScaler()
 
     for epoch in range(config.base_epochs):
         model.train()
@@ -161,7 +161,7 @@ def train_inc(model, train_loader, session_idx, current_classes, config):
     criterion = nn.CrossEntropyLoss()
 
     # Initialize gradient scaler for mixed precision training
-    scaler = GradScaler('cuda')
+    scaler = GradScaler()
 
     # Store original classifier data for stability
     original_classifier_data = model.classifiers.data[:current_classes - config.novel_classes_per_session].clone()
