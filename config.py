@@ -15,7 +15,7 @@ class Config:
     shots_per_class = 5   # 5-shot
 
     # Feature Extractor
-    backbone = 'resnet20' # Feature Extractor - backbone as resnet20
+    backbone = 'resnet20' # Feature Extractor
     feature_dim = 64     # Feature Vector Dimension for resnet20
 
     # Training - Same as the paper

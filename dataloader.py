@@ -1,4 +1,4 @@
-# Import neccesary libraries
+# Import necessary libraries
 import torch
 import torchvision
 import torchvision.transforms as transforms

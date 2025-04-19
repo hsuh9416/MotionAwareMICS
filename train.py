@@ -1,9 +1,8 @@
-# Import neccesary libraries
+# Import necessary libraries
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
-from sklearn.decomposition import PCA
 from tqdm import tqdm
 
 # 훈련 함수 (기본 세션)

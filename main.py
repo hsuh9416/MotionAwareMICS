@@ -1,23 +1,36 @@
-# Import neccesary libraries
+# Import necessary libraries
+import random
+import numpy as np
+import torch
 import torch.nn as nn
-from sklearn.decomposition import PCA
 from torch.utils.data import DataLoader
 
-from mics import *
-from dataloader import *
-from evaluate import *
-from train import *
+# User-defined
+from config import Config
+from mics_impl import MICS
+from dataloader import load_cifar100, load_ucf101
+from evaluate import evaluate, compute_nVar, visualize_pca
+from train import train_base_session, train_incremental_session
 
-#전체 MICS 알고리즘 실행 함수
+# Seed setting for reproducibility
+def set_seed(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+# Function to execute the entire MICS algorithm
 def run_mics(config):
-    # 데이터셋 로드
-    if config.dataset == 'cifar100':
+    # load dataset
+    if config.dataset == 'cifar100': # CIFAR-100
         sessions_train_data, sessions_test_data = load_cifar100(
             config.base_classes,
             config.novel_classes_per_session,
             config.num_sessions
         )
-    else:  # UCF101 또는 다른 모션 데이터셋
+    else:  # UCF101
         sessions_train_data, sessions_test_data = load_ucf101(
             config.base_classes,
             config.novel_classes_per_session,
@@ -25,7 +38,7 @@ def run_mics(config):
             config.shots_per_class
         )
 
-    # 데이터 로더 생성
+    # Create dataloader
     train_loaders = [
         DataLoader(dataset, batch_size=config.batch_size, shuffle=True,
                   num_workers=config.num_workers)
@@ -38,24 +51,24 @@ def run_mics(config):
         for dataset in sessions_test_data
     ]
 
-    # 모델 초기화
+    # Init model
     model = MICS(config, config.base_classes).to(config.device)
 
-    # 기본 세션 훈련
+    # Base session Training
     print("Training base session...")
     model = train_base_session(model, train_loaders[0], config)
 
-    # 기본 세션 평가
+    # Base session Evaluation
     current_classes = config.base_classes
-    acc_per_session = evaluate(model, [test_loaders[0]], current_classes, config)
-    nvar = compute_nvar(model, [test_loaders[0]], current_classes, config)
-    visualize_features_pca(model, [test_loaders[0]], current_classes, config, 0)
+    acc_per_session = evaluate(model, [test_loaders[0]], config)
+    nVar = compute_nVar(model, [test_loaders[0]], current_classes, config)
+    visualize_pca(model, [test_loaders[0]], current_classes, config, 0)
 
-    # 각 증분 세션 처리
+    # Process each incremental session
     for session_idx in range(1, config.num_sessions + 1):
         print(f"\nTraining incremental session {session_idx}...")
 
-        # 분류기 확장
+        # Classifier extension
         novel_classes = config.novel_classes_per_session
         expanded_classifiers = nn.Parameter(
             torch.cat([
@@ -66,51 +79,44 @@ def run_mics(config):
         model.classifiers = expanded_classifiers
         current_classes += novel_classes
 
-        # 증분 세션 훈련
+        # Incremental Session Training
         model = train_incremental_session(
             model, train_loaders[session_idx], session_idx, current_classes, config
         )
 
-        # 평가
+        # Evaluation
         acc_per_session = evaluate(
+            model, test_loaders[:session_idx+1], config)
+        nVar = compute_nVar(
             model, test_loaders[:session_idx+1], current_classes, config
         )
-        nvar = compute_nvar(
-            model, test_loaders[:session_idx+1], current_classes, config
-        )
-        visualize_features_pca(
+        visualize_pca(
             model, test_loaders[:session_idx+1], current_classes, config, session_idx
         )
 
-    return model, acc_per_session
+    return model, nVar, acc_per_session
 
 
-# 메인 실행 코드
+# Main function
 def main():
-    # 설정
+    # Set seed
+    set_seed(42)
+
+    # Call pre-set config
     config = Config()
 
-    # MICS 알고리즘 실행
-    print("Running MICS algorithm...")
-    model, acc_history = run_mics(config)
+    # Plain MICS
+    print("Running Plain MICS algorithm...")
+    model_plain, nVar_plain, history_plain = run_mics(config)
 
-    # 모션 인식 활성화 후 다시 실행 (선택적)
-    if not config.use_motion:
-        print("\nRunning MICS with motion-aware feature adaptation...")
-        config.use_motion = True
-        model_motion, acc_history_motion = run_mics(config)
+    # Motion aware MICS
+    config.use_motion = True
+    config.dataset = 'ucf101' # Dataset for motion detection
+    config.backbone = 'resnet18'
+    config.feature_dim = 512
+    model_motion, nVar_motion, history_motion = run_mics(config)
 
-        # 결과 비교 시각화
-        plt.figure(figsize=(10, 6))
-        x = list(range(len(acc_history)))
-        plt.plot(x, acc_history, 'o-', label='Standard MICS')
-        plt.plot(x, acc_history_motion, 's-', label='Motion-Aware MICS')
-        plt.xlabel('Session')
-        plt.ylabel('Accuracy (%)')
-        plt.title('Comparison of Standard MICS and Motion-Aware MICS')
-        plt.legend()
-        plt.grid(True, linestyle='--', alpha=0.7)
-        plt.savefig('mics_comparison.png', dpi=300)
-        plt.close()
+    # Visualize the results(Acc, Loss)
+    #TODO to be updated
 
     print("Experiment completed!")

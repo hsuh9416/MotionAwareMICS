@@ -1,25 +1,22 @@
-# Import neccesary libraries
-import torch
-import torch.nn as nn
+# Import necessary libraries
 import torch.nn.functional as F
 import numpy as np
-from sklearn.decomposition import PCA
 import cv2
 
-from backbone import *
+from feature_extractor import *
 
-# MICS 알고리즘의 핵심 구현
+# Implemented MICS Model
 class MICS(nn.Module):
     def __init__(self, config, num_classes):
         super(MICS, self).__init__()
         self.config = config
         self.device = config.device
 
-        # 백본 모델 선택
+        # Set the Feature Extractor
         if config.dataset == 'cifar100':
+            self.backbone = ResNet20Backbone(config.feature_dim).to(self.device)
+        else:  # Motion dataset 'ucf101'
             self.backbone = ResNet18Backbone(config.feature_dim).to(self.device)
-        else:  # 모션 데이터셋
-            self.backbone = MotionResNet18Backbone(config.feature_dim).to(self.device)
 
         # 클래스 분류기
         self.classifiers = nn.Parameter(torch.randn(num_classes, config.feature_dim).to(self.device))
@@ -138,15 +135,13 @@ def compute_optical_flow(frames):
             next_gray = cv2.cvtColor(next_frame, cv2.COLOR_RGB2GRAY)
 
             # 광학 흐름 계산 (Farneback 방법)
-            flow = cv2.calcOpticalFlowFarneback(prev_gray, next_gray, None,
-                                               0.5, 3, 15, 3, 5, 1.2, 0)
+            flow = cv2.calcOpticalFlowFarneback(prev_gray, next_gray, None,0.5, 3, 15, 3, 5, 1.2, 0)
 
             # x, y 방향 흐름을 텐서로 변환
             flows[b, 0, t] = torch.from_numpy(flow[:, :, 0]).to(frames.device)
             flows[b, 1, t] = torch.from_numpy(flow[:, :, 1]).to(frames.device)
 
     return flows
-
 
 # 모션 인식 모듈
 class MotionAwareMixup(nn.Module):
