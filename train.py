@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 from tqdm import tqdm
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import autocast, GradScaler
 
 
 # Train - Base session
@@ -28,7 +28,7 @@ def train_base(model, train_loader, config):
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.base_epochs)
 
     # Initialize gradient scaler for mixed precision training
-    scaler = GradScaler()
+    scaler = GradScaler('cuda')
 
     for epoch in range(config.base_epochs):
         model.train()
@@ -156,7 +156,7 @@ def train_base(model, train_loader, config):
                 optimizer.zero_grad()
 
                 # Use mixed precision for forward pass
-                with autocast():
+                with autocast('cuda'):
                     # Use features directly with classifier (skip backbone pass)
                     logits = F.linear(
                         F.normalize(mixed_features_tensor, p=2, dim=1),
@@ -177,7 +177,7 @@ def train_base(model, train_loader, config):
             optimizer.zero_grad()
 
             # Use mixed precision
-            with autocast():
+            with autocast('cuda'):
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
 
@@ -224,7 +224,7 @@ def train_inc(model, train_loader, session_idx, current_classes, config):
     criterion = nn.CrossEntropyLoss()
 
     # Initialize gradient scaler for mixed precision training
-    scaler = GradScaler()
+    scaler = GradScaler('cuda')
 
     # Select parameters to update (those with small absolute values)
     backbone_params = []
@@ -421,7 +421,7 @@ def train_inc(model, train_loader, session_idx, current_classes, config):
                 optimizer.zero_grad()
 
                 # Use mixed precision
-                with autocast():
+                with autocast('cuda'):
                     # Use features directly with classifier
                     logits = F.linear(
                         F.normalize(mixed_features_tensor, p=2, dim=1),
@@ -442,7 +442,7 @@ def train_inc(model, train_loader, session_idx, current_classes, config):
             optimizer.zero_grad()
 
             # Use mixed precision
-            with autocast():
+            with autocast('cuda'):
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
 
