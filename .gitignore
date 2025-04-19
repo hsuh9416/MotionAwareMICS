@@ -2,6 +2,7 @@
 /data/index_list/cifar100/*
 /data/ucfTrainTestlist/*
 /data/UCF101/*
+/data/kaggle.json
 
 # Exception (placeholder)
 !/data/index_list/cifar100/placeholder.txt
