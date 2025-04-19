@@ -153,10 +153,10 @@ def load_ucf101(base_classes, novel_classes_per_session, num_sessions, shots_per
     # Load UCF101 dataset
     trainset = torchvision.datasets.UCF101(root='./data', annotation_path='ucfTrainTestlist',
                                            frames_per_clip=16, step_between_clips=8,
-                                           fold=1, train=True, transform=transform_train, download=True)
+                                           fold=1, train=True, transform=transform_train)
     testset = torchvision.datasets.UCF101(root='./data', annotation_path='ucfTrainTestlist',
                                           frames_per_clip=16, step_between_clips=8,
-                                          fold=1, train=False, transform=transform_test, download=True)
+                                          fold=1, train=False, transform=transform_test)
 
     # Create indices by class
     train_indices = {i: [] for i in range(101)}  # UCF101 has 101 classes
