@@ -4,14 +4,13 @@ import shutil
 import random
 import numpy as np
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 
 # Import user-defined modules
 from config import Config
 from test_config import TestConfig
+from data.dataloader.data_utils import set_up_datasets, get_dataloader
 from mics_impl import MICS  # Using our fixed implementation
-from dataloader import load_cifar100, load_ucf101
 from evaluate import evaluate, compute_nVar, visualize_pca, visualize_nVar, visualize_acc
 from train import train_base, train_inc  # Using our fixed training functions
 
@@ -27,21 +26,9 @@ def set_seed(seed=42):
 
 
 # Function to execute the entire MICS algorithm
-def run_mics(config):
+def run_mics(config, session):
     # Load appropriate dataset
-    if config.dataset == 'cifar100':  # CIFAR-100
-        sessions_train_data, sessions_test_data = load_cifar100(
-            config.base_classes,
-            config.novel_classes_per_session,
-            config.num_sessions
-        )
-    else:  # UCF101
-        sessions_train_data, sessions_test_data = load_ucf101(
-            config.base_classes,
-            config.novel_classes_per_session,
-            config.num_sessions,
-            config.shots_per_class
-        )
+    sessions_train_data, sessions_test_data = get_dataloader(config, session)
 
     # Create dataloaders with the configured batch size and worker count
     train_loaders = [
@@ -129,6 +116,7 @@ def main(isTest):
 
     # Ensure proper configuration for plain MICS
     config.dataset = 'cifar100'
+    config = set_up_datasets(config) # Setup Arguments
     config.backbone = 'resnet20'
     config.feature_dim = 64
     config.use_motion = False
@@ -150,6 +138,7 @@ def main(isTest):
     # Reconfigure for motion-aware MICS
     config.use_motion = True
     config.dataset = 'ucf101'
+    config = set_up_datasets(config)  # Setup Arguments
     config.backbone = 'resnet18'
     config.feature_dim = 512
 
