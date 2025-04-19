@@ -7,7 +7,7 @@ import torchvision
 import torchvision.transforms as transforms
 from torchvision.datasets.vision import VisionDataset
 from torchvision.datasets.utils import check_integrity, download_and_extract_archive
-from data.dataloader.cifar100.autoaugment import Cutout
+from data.dataloader.ucf101.autoaugment import VideoCutout
 
 
 class UCF101Dataset(VisionDataset):
@@ -66,9 +66,8 @@ class UCF101Dataset(VisionDataset):
                     transforms.Resize((128, 128)),
                     transforms.RandomCrop(112),
                     transforms.RandomHorizontalFlip(),
-                    # Add custom video augmentation here if needed
                     transforms.ToTensor(),
-                    Cutout(n_holes=1, length=16),
+                    VideoCutout(n_holes=1, length=16), # Augmented
                     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
                 ])
             else:
