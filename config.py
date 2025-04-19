@@ -12,6 +12,7 @@ class Config:
 
     # Dataset(Default: CIFAR-100)
     dataset = 'cifar100'  # Plain: 'cifar100' Motion-aware: 'ucf101'
+    dataroot = '/content/drive/MyDrive/MotionAwareMICS/data/' # Colab
     base_class = 60     # Follows standard FSCIL protocol. base: increment = 60: 40
     num_classes = 100 # Total number of classes
     way = 5

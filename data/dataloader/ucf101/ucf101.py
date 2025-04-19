@@ -6,9 +6,7 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 from torchvision.datasets.vision import VisionDataset
-from torchvision.datasets.utils import check_integrity, download_and_extract_archive
 from data.dataloader.ucf101.autoaugment import VideoCutout
-
 
 class UCF101Dataset(VisionDataset):
     """UCF101 Action Recognition Dataset adapted for Few-Shot Class-Incremental Learning.
@@ -81,7 +79,7 @@ class UCF101Dataset(VisionDataset):
         # Initialize the UCF101 dataset with torchvision
         try:
             self.ucf_dataset = torchvision.datasets.UCF101(
-                root=self.root,
+                root=os.path.join(self.root, 'UCF101'),
                 annotation_path=os.path.join(self.root, 'ucfTrainTestlist'),
                 frames_per_clip=self.frames_per_clip,
                 step_between_clips=self.step_between_clips,
