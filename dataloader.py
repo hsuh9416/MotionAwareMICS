@@ -27,7 +27,9 @@
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import Subset
+
 from config import Config
+import data.dataloader.cifar100.cifar as Dataset
 
 def load_cifar100(base_classes, novel_classes_per_session, num_sessions):
     """
