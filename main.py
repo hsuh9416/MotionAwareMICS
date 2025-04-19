@@ -10,7 +10,7 @@ from config import Config
 from mics_impl import MICS
 from dataloader import load_cifar100, load_ucf101
 from evaluate import evaluate, compute_nVar, visualize_pca
-from train import train_base_session, train_incremental_session
+from train import train_base, train_inc
 
 # Seed setting for reproducibility
 def set_seed(seed=42):
@@ -56,7 +56,7 @@ def run_mics(config):
 
     # Base session Training
     print("Training base session...")
-    model = train_base_session(model, train_loaders[0], config)
+    model = train_base(model, train_loaders[0], config)
 
     # Base session Evaluation
     current_classes = config.base_classes
@@ -80,7 +80,7 @@ def run_mics(config):
         current_classes += novel_classes
 
         # Incremental Session Training
-        model = train_incremental_session(
+        model = train_inc(
             model, train_loaders[session_idx], session_idx, current_classes, config
         )
 
@@ -118,5 +118,3 @@ def main():
 
     # Visualize the results(Acc, Loss)
     #TODO to be updated
-
-    print("Experiment completed!")

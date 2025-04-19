@@ -1,12 +1,13 @@
 # Import necessary libraries
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 from tqdm import tqdm
 
-# 훈련 함수 (기본 세션)
-def train_base_session(model, train_loader, config):
+# Train - Base session
+def train_base(model, train_loader, config):
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=config.learning_rate,
                          momentum=config.momentum, weight_decay=config.weight_decay)
@@ -32,7 +33,7 @@ def train_base_session(model, train_loader, config):
 
             for i in range(inputs.size(0)):
                 if np.random.random() < 0.5 and targets_a[i] != targets_b[i]:
-                    # 클래스가 다른 경우만 믹스업 수행
+                    # Manifold mix-up
                     mixed_x, soft_label = model.manifold_mixup(
                         inputs_a[i:i+1], inputs_b[i:i+1],
                         targets_a[i:i+1], targets_b[i:i+1],
@@ -41,7 +42,7 @@ def train_base_session(model, train_loader, config):
                     mixed_samples.append(mixed_x)
                     mixed_labels.append(soft_label)
 
-            # 믹스업 샘플이 있는 경우 처리
+            # In case of mix-up samples
             if mixed_samples:
                 mixed_inputs = torch.cat(mixed_samples, dim=0)
                 mixed_targets = torch.stack(mixed_labels, dim=0)
@@ -68,7 +69,7 @@ def train_base_session(model, train_loader, config):
 
         scheduler.step()
 
-        # 에폭 결과 출력
+        # Print training Result
         train_loss = running_loss / len(train_loader)
         train_acc = 100. * correct / total
         print(f'Epoch: {epoch}, Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}%')
@@ -79,9 +80,8 @@ def train_base_session(model, train_loader, config):
 
     return model
 
-
-# 훈련 함수 (증분 세션)
-def train_incremental_session(model, train_loader, session_idx, current_classes, config):
+# Train - Incremental session
+def train_inc(model, train_loader, session_idx, current_classes, config):
     criterion = nn.CrossEntropyLoss()
 
     # 업데이트할 파라미터 선택 (절대값이 작은 파라미터)
@@ -157,7 +157,7 @@ def train_incremental_session(model, train_loader, session_idx, current_classes,
 
         scheduler.step()
 
-        # 에폭 결과 출력
+        # Print training Result
         train_loss = running_loss / len(train_loader)
         print(f'Incremental Session {session_idx}, Epoch: {epoch}, Train Loss: {train_loss:.4f}')
 
@@ -188,7 +188,7 @@ def train_incremental_session(model, train_loader, session_idx, current_classes,
 
             prototypes.append(class_prototype)
 
-    # 분류기 업데이트
+    # Update classifiers
     model.classifiers = nn.Parameter(torch.stack(prototypes, dim=0))
 
     return model
