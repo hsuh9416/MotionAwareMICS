@@ -119,7 +119,7 @@ def load_cifar100(base_classes, novel_classes_per_session, num_sessions):
 
     return sessions_train_data, sessions_test_data
 
-def load_ucf101(base_classes, novel_classes_per_session, num_sessions, shots_per_class):
+def load_ucf101(base_classes, novel_classes_per_session, num_sessions, shots_per_class, max_classes=30):
     """
     Load and preprocess UCF101 dataset for Few-Shot Class Incremental Learning (FSCIL) with motion awareness.
     This function divides the dataset into base session and incremental sessions based on the given parameters.
@@ -129,14 +129,15 @@ def load_ucf101(base_classes, novel_classes_per_session, num_sessions, shots_per
         novel_classes_per_session (int): Number of new classes per incremental session
         num_sessions (int): Number of incremental sessions
         shots_per_class (int): Number of samples per class for incremental sessions
+        max_classes (int): Maximum number of classes to use
 
     Returns:
         tuple: (sessions_train_data, sessions_test_data) where each element is a list of datasets for each session
     """
     # Data augmentation and preprocessing for training
     transform_train = transforms.Compose([
-        transforms.Resize((128, 128)),
-        transforms.RandomCrop(112),
+        transforms.Resize((64, 64)),
+        transforms.RandomCrop(56),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
@@ -144,8 +145,8 @@ def load_ucf101(base_classes, novel_classes_per_session, num_sessions, shots_per
 
     # Preprocessing for testing (no augmentation)
     transform_test = transforms.Compose([
-        transforms.Resize((128, 128)),
-        transforms.CenterCrop(112),
+        transforms.Resize((64, 64)),
+        transforms.CenterCrop(56),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
@@ -153,19 +154,25 @@ def load_ucf101(base_classes, novel_classes_per_session, num_sessions, shots_per
     # Load UCF101 dataset
     trainset = torchvision.datasets.UCF101(root='/content/drive/MyDrive/MotionAwareMICS/data/UCF101',
                                            annotation_path='/content/drive/MyDrive/MotionAwareMICS/data/ucfTrainTestlist',
-                                           frames_per_clip=16, step_between_clips=8,
-                                           fold=1, train=True, transform=transform_train)
+                                           frames_per_clip=8,
+                                           step_between_clips=16,
+                                           fold=1,
+                                           train=True,
+                                           transform=transform_train)
     testset = torchvision.datasets.UCF101(root='/content/drive/MyDrive/MotionAwareMICS/data/UCF101',
                                           annotation_path='/content/drive/MyDrive/MotionAwareMICS/data/ucfTrainTestlist',
-                                          frames_per_clip=16, step_between_clips=8,
-                                          fold=1, train=False, transform=transform_test)
+                                          frames_per_clip=8,
+                                          step_between_clips=16,
+                                          fold=1,
+                                          train=False,
+                                          transform=transform_test)
 
     # Create indices by class
-    train_indices = {i: [] for i in range(101)}  # UCF101 has 101 classes
+    train_indices = {i: [] for i in range(max_classes)}  # Total: 101, Test only: 30
     for idx, (_, label) in enumerate(trainset):
         train_indices[label].append(idx)
 
-    test_indices = {i: [] for i in range(101)}
+    test_indices = {i: [] for i in range(max_classes)}
     for idx, (_, label) in enumerate(testset):
         test_indices[label].append(idx)
 
