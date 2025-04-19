@@ -111,18 +111,18 @@ def main():
         shutil.rmtree('results')
     os.makedirs('results')
 
-    # Plain MICS
-    print("=" * 50)
-    print("Running Plain MICS algorithm...")
-    print("=" * 50)
-    model_plain, nVar_plain, acc_plain = run_mics(config)
-
-    # Save checkpoints (back up intermediate results)
-    torch.save({
-        'model_state_dict': model_plain.state_dict(),
-        'nVar': nVar_plain,
-        'accuracy': acc_plain
-    }, 'results/plain_mics_checkpoint.pth')
+    # # Plain MICS
+    # print("=" * 50)
+    # print("Running Plain MICS algorithm...")
+    # print("=" * 50)
+    # model_plain, nVar_plain, acc_plain = run_mics(config)
+    #
+    # # Save checkpoints (back up intermediate results)
+    # torch.save({
+    #     'model_state_dict': model_plain.state_dict(),
+    #     'nVar': nVar_plain,
+    #     'accuracy': acc_plain
+    # }, 'results/plain_mics_checkpoint.pth')
 
     print("\n" + "=" * 50)
     print("Running Motion-Aware MICS algorithm...")
