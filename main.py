@@ -1,4 +1,6 @@
 # Import necessary libraries
+import os
+import shutil
 import random
 import numpy as np
 import torch
@@ -9,7 +11,7 @@ from torch.utils.data import DataLoader
 from config import Config
 from mics_impl import MICS
 from dataloader import load_cifar100, load_ucf101
-from evaluate import evaluate, compute_nVar, visualize_pca
+from evaluate import evaluate, compute_nVar, visualize_pca, visualize_nVar, visualize_acc
 from train import train_base, train_inc
 
 # Seed setting for reproducibility
@@ -105,16 +107,46 @@ def main():
     # Call pre-set config
     config = Config()
 
+    # Setup directory for result saving
+    if os.path.exists('results'):
+        shutil.rmtree('results')
+    os.makedirs('results')
+
     # Plain MICS
+    print("=" * 50)
     print("Running Plain MICS algorithm...")
-    model_plain, nVar_plain, history_plain = run_mics(config)
+    print("=" * 50)
+    model_plain, nVar_plain, acc_plain = run_mics(config)
+
+    # Save checkpoints (back up intermediate results)
+    torch.save({
+        'model_state_dict': model_plain.state_dict(),
+        'nVar': nVar_plain,
+        'accuracy': acc_plain
+    }, 'results/plain_mics_checkpoint.pth')
+
+    print("\n" + "=" * 50)
+    print("Running Motion-Aware MICS algorithm...")
+    print("=" * 50)
 
     # Motion aware MICS
     config.use_motion = True
     config.dataset = 'ucf101' # Dataset for motion detection
     config.backbone = 'resnet18'
     config.feature_dim = 512
-    model_motion, nVar_motion, history_motion = run_mics(config)
 
-    # Visualize the results(Acc, Loss)
-    #TODO to be updated
+    model_motion, nVar_motion, acc_motion = run_mics(config)
+
+    # Save checkpoints (back up intermediate results)
+    torch.save({
+        'model_state_dict': model_motion.state_dict(),
+        'nVar': nVar_motion,
+        'accuracy': acc_motion
+    }, 'results/motion_mics_checkpoint.pth')
+
+    # Visualize nVar
+    visualize_nVar(nVar_plain, nVar_motion, config)
+
+    # Visualize session-by-session accuracy and performance degradation
+    visualize_acc(acc_plain, acc_motion, config)
+
