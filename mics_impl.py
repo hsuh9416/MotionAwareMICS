@@ -39,8 +39,25 @@ class MICS(nn.Module):
         return logits / 0.1  # temperature scaling
 
     def compute_midpoint_classifier(self, class1, class2):
-        # Compute midpoint
+        """중간점 분류기 계산"""
+        # 입력이 텐서인 경우 정수로 변환
+        if isinstance(class1, torch.Tensor):
+            class1 = class1.item()
+        if isinstance(class2, torch.Tensor):
+            class2 = class2.item()
+
+        # 중간점 계산
         midpoint = (self.classifiers[class1] + self.classifiers[class2]) / 2
+
+        # 차원 확인 및 정규화
+        if len(midpoint.shape) > 1:
+            # 이미 2차원 이상이면 첫 차원이 1인지 확인
+            if midpoint.shape[0] != 1:
+                midpoint = midpoint.unsqueeze(0)
+        else:
+            # 1차원이면 2차원으로 변환
+            midpoint = midpoint.unsqueeze(0)
+
         return midpoint
 
     def compute_soft_label(self, lam, gamma):
@@ -171,9 +188,15 @@ class MICS(nn.Module):
             # 중간점 분류기 계산
             midpoint = self.compute_midpoint_classifier(y1, y2)
 
+            # 차원 맞추기
+            if len(midpoint.shape) != 2:
+                midpoint = midpoint.view(1, -1)  # 1차원이면 2차원으로 변환
+            elif len(midpoint.shape) == 2 and midpoint.shape[0] != 1:
+                midpoint = midpoint.unsqueeze(0)  # 첫 차원이 1이 아니면 차원 추가
+
             # 분류기 확장
             new_classifiers = nn.Parameter(
-                torch.cat([self.classifiers.data, midpoint.unsqueeze(0)], dim=0)
+                torch.cat([self.classifiers.data, midpoint], dim=0)
             ).to(self.device)
 
             self.classifiers = new_classifiers
