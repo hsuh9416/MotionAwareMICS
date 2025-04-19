@@ -7,7 +7,6 @@ import numpy as np
 from tqdm import tqdm
 from torch.amp import autocast, GradScaler
 
-
 # Train - Base session
 def train_base(model, train_loader, config):
     """
