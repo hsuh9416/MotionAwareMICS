@@ -39,29 +39,43 @@ def train_base(model, train_loader, config):
         for batch_idx, (inputs, targets) in enumerate(tqdm(train_loader)):
             inputs, targets = inputs.to(config.device), targets.to(config.device)
 
-            # Create sample pairs for mixup
-            indices = torch.randperm(inputs.size(0)).to(config.device)
-            inputs_b, targets_b = inputs[indices], targets[indices]
-
+            # Regular training on original samples
             optimizer.zero_grad()
 
-            # Regular training first
             with autocast('cuda'):
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
 
             # Scale gradients and perform backward pass
             scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
 
-            # Apply mixup for a subset of samples
-            if np.random.random() < 0.5:  # 50% chance to use mixup
-                # Select valid pairs (different classes)
+            # Track metrics for original samples
+            running_loss += loss.item()
+            _, predicted = outputs.max(1)
+            total += targets.size(0)
+            correct += predicted.eq(targets).sum().item()
+
+            # Apply mixup on a separate forward-backward pass (50% chance)
+            if np.random.random() < 0.5:
+                # Create sample pairs
+                indices = torch.randperm(inputs.size(0)).to(config.device)
+                inputs_b, targets_b = inputs[indices], targets[indices]
+
+                # Find valid class pairs (different classes)
                 valid_pairs = []
-                for i in range(min(16, inputs.size(0))):  # Limit to avoid memory issues
+                for i in range(min(16, inputs.size(0))):  # Limit batch size for mixup
                     if targets[i] != targets_b[i]:
                         valid_pairs.append(i)
 
                 if valid_pairs:
+                    # Precompute total classes after all virtual classes
+                    # This is crucial for fixing the dimension mismatch
+                    potential_virtual_classes = len(valid_pairs)
+                    total_classes = len(model.classifiers) + potential_virtual_classes
+
+                    # Process all valid pairs in a single batch
                     batch_mixed_features = []
                     batch_mixed_labels = []
 
@@ -69,53 +83,60 @@ def train_base(model, train_loader, config):
                         x1, y1 = inputs[i:i + 1], targets[i:i + 1]
                         x2, y2 = inputs_b[i:i + 1], targets_b[i:i + 1]
 
-                        # Apply manifold mixup
-                        with autocast('cuda'):
-                            mixed_features, mixed_targets = model.manifold_mixup(
-                                x1, x2, y1, y2, 0
-                            )
-                            batch_mixed_features.append(mixed_features)
-                            batch_mixed_labels.append(mixed_targets)
+                        # Apply manifold mixup with fixed total_classes
+                        mixed_features, mixed_label = model.manifold_mixup(
+                            x1, x2, y1, y2, 0, total_classes
+                        )
 
-                    # Process all mixup samples together
+                        batch_mixed_features.append(mixed_features)
+                        batch_mixed_labels.append(mixed_label)
+
+                    # Process all mixup samples together if we have any
                     if batch_mixed_features:
-                        with autocast('cuda'):
-                            mixed_features_tensor = torch.cat(batch_mixed_features, dim=0)
-                            mixed_targets_tensor = torch.stack(batch_mixed_labels, dim=0)
+                        optimizer.zero_grad()
 
-                            # Use features directly with classifier
+                        with autocast('cuda'):
+                            # Concatenate all mixed features
+                            mixed_features_tensor = torch.cat(batch_mixed_features, dim=0)
+
+                            # Stack all mixed labels - now they should have consistent dimensions
+                            mixed_labels_tensor = torch.stack(batch_mixed_labels, dim=0)
+
+                            # Forward pass with mixed features
+                            # Ensure we're only using as many classifier weights as we have
+                            classifier_weights = F.normalize(
+                                model.classifiers[:total_classes], p=2, dim=1
+                            )
+
                             logits = F.linear(
                                 F.normalize(mixed_features_tensor, p=2, dim=1),
-                                F.normalize(model.classifiers, p=2, dim=1)
+                                classifier_weights
                             )
+
+                            # Apply temperature scaling
                             mixed_outputs = logits / config.temperature
 
-                            # KL divergence loss for soft labels
+                            # Compute KL divergence loss
                             mixup_loss = -torch.sum(
-                                F.log_softmax(mixed_outputs, dim=1) * mixed_targets_tensor,
+                                F.log_softmax(mixed_outputs, dim=1) * mixed_labels_tensor,
                                 dim=1
                             ).mean()
 
-                            # Scale and accumulate gradient
-                            scaler.scale(mixup_loss).backward()
+                        # Scale and backward
+                        scaler.scale(mixup_loss).backward()
+                        scaler.step(optimizer)
+                        scaler.update()
 
-            # Update weights
-            scaler.step(optimizer)
-            scaler.update()
-
-            running_loss += loss.item()
-            _, predicted = outputs.max(1)
-            total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
+                        running_loss += mixup_loss.item()
 
         scheduler.step()
 
         # Print progress
-        train_loss = running_loss / len(train_loader)
+        train_loss = running_loss / (len(train_loader) * 1.5)  # Adjust for extra mixup batches
         train_acc = 100. * correct / total
         print(f'Epoch: {epoch}, Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}%')
 
-    # Remove virtual classifiers after base training
+    # Remove virtual classifiers after training
     model.cleanup_virtual_classifiers(config.base_classes)
 
     return model

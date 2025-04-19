@@ -83,18 +83,98 @@ class MICS(nn.Module):
 
         return prob_class1, prob_virtual, prob_class2
 
-    def manifold_mixup(self, x1, x2, y1, y2, session_idx):
+    def manifold_mixup(self, x1, x2, y1, y2, session_idx, total_classes=None):
         """
         Perform Manifold Mixup - mix features in the middle layers
         x1, x2: input image samples
         y1, y2: class labels
+        total_classes: fixed size for soft labels (to ensure consistent tensor sizes)
         """
         # Sample mixing ratio from beta distribution
         alpha = self.config.alpha
         lam = np.random.beta(alpha, alpha)
 
-        # Extract features and apply mixup
-        mixed_features, soft_label = self._apply_mixup(x1, x2, y1, y2, lam)
+        # Get integer class indices
+        y1_int = int(y1.item())
+        y2_int = int(y2.item())
+
+        # Class pair (ordered for consistency)
+        class_pair = (min(y1_int, y2_int), max(y1_int, y2_int))
+
+        # Create virtual class if needed
+        if class_pair not in self.virtual_class_indices:
+            # New virtual class index
+            virtual_idx = len(self.classifiers)
+            self.virtual_class_indices[class_pair] = virtual_idx
+
+            # Calculate midpoint classifier
+            midpoint = self.compute_midpoint_classifier(y1_int, y2_int)
+
+            # Expand classifiers
+            new_classifiers = nn.Parameter(
+                torch.cat([self.classifiers.data, midpoint], dim=0)
+            ).to(self.device)
+
+            self.classifiers = new_classifiers
+
+        virtual_idx = self.virtual_class_indices[class_pair]
+
+        # Apply mixup based on model type
+        if hasattr(self.backbone, 'features'):
+            # For ResNet20/ResNet18 with features attribute
+            layers = list(self.backbone.features.children())
+            layer_idx = np.random.randint(1, len(layers) - 1)
+
+            # Forward to middle layer
+            h1 = x1
+            h2 = x2
+            for j in range(layer_idx):
+                h1 = layers[j](h1)
+                h2 = layers[j](h2)
+
+            # Apply motion-aware mixup if enabled (for video data)
+            if self.config.use_motion and len(x1.shape) == 5:
+                # Video-specific processing
+                adjusted_lam = lam
+                # Motion awareness code would go here
+            else:
+                adjusted_lam = lam
+
+            # Mix features
+            h_mixed = adjusted_lam * h1 + (1 - adjusted_lam) * h2
+
+            # Continue forward pass
+            for j in range(layer_idx, len(layers)):
+                h_mixed = layers[j](h_mixed)
+
+            mixed_features = torch.flatten(h_mixed, 1)
+        else:
+            # Fallback to standard feature extraction
+            with torch.no_grad():
+                feat1 = self.backbone(x1)
+                feat2 = self.backbone(x2)
+
+            mixed_features = lam * feat1 + (1 - lam) * feat2
+
+        # Calculate soft labels
+        gamma = self.config.gamma
+        prob_1, prob_v, prob_2 = self.compute_soft_label(lam, gamma)
+
+        # Create soft label tensor with fixed size if specified
+        if total_classes is None:
+            total_classes = len(self.classifiers)
+
+        soft_label = torch.zeros(total_classes, device=self.device)
+
+        # Make sure indices are within bounds
+        if y1_int < total_classes and y2_int < total_classes and virtual_idx < total_classes:
+            soft_label[y1_int] = prob_1
+            soft_label[y2_int] = prob_2
+            soft_label[virtual_idx] = prob_v
+        else:
+            # Handle out-of-bounds case
+            valid_indices = torch.ones(total_classes, device=self.device) / total_classes
+            soft_label = valid_indices  # Uniform distribution as fallback
 
         return mixed_features, soft_label
 
