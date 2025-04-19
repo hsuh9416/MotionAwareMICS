@@ -108,9 +108,9 @@ def main(isTest):
     config = TestConfig() if isTest else Config()
 
     # Setup directory for result saving
-    if os.path.exists('results'):
-        shutil.rmtree('results')
-    os.makedirs('results')
+    if os.path.exists('/content/drive/MyDrive/MotionAwareMICS/results'):
+        shutil.rmtree('/content/drive/MyDrive/MotionAwareMICS/results')
+    os.makedirs('/content/drive/MyDrive/MotionAwareMICS/results')
 
     # Plain MICS
     print("=" * 50)
@@ -123,7 +123,7 @@ def main(isTest):
         'model_state_dict': model_plain.state_dict(),
         'nVar': nVar_plain,
         'accuracy': acc_plain
-    }, 'results/plain_mics_checkpoint.pth')
+    }, '/content/drive/MyDrive/MotionAwareMICS/results/plain_mics_checkpoint.pth')
 
     print("\n" + "=" * 50)
     print("Running Motion-Aware MICS algorithm...")
@@ -142,7 +142,7 @@ def main(isTest):
         'model_state_dict': model_motion.state_dict(),
         'nVar': nVar_motion,
         'accuracy': acc_motion
-    }, 'results/motion_mics_checkpoint.pth')
+    }, '/content/drive/MyDrive/MotionAwareMICS/results/motion_mics_checkpoint.pth')
 
     # Visualize nVar
     visualize_nVar(nVar_plain, nVar_motion, config)
