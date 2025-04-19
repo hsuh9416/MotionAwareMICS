@@ -1,11 +1,13 @@
-# Import necessary libraries
+# Updated MICS Model implementation
+# The main issue is in how the model handles classifiers in incremental sessions
+
+import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import cv2
 
-from feature_extractor import *
 
-# Implemented MICS Model
 class MICS(nn.Module):
     def __init__(self, config, num_classes):
         super(MICS, self).__init__()
@@ -14,18 +16,27 @@ class MICS(nn.Module):
 
         # Set the Feature Extractor
         if config.dataset == 'cifar100':
+            from feature_extractor import ResNet20Backbone
             self.backbone = ResNet20Backbone(config.feature_dim).to(self.device)
         else:  # Motion dataset 'ucf101'
+            from feature_extractor import ResNet18Backbone
             self.backbone = ResNet18Backbone(config.feature_dim).to(self.device)
 
         # class classifier
         self.classifiers = nn.Parameter(torch.randn(num_classes, config.feature_dim).to(self.device))
+
+        # Normalize classifiers at initialization
+        with torch.no_grad():
+            self.classifiers.data = F.normalize(self.classifiers.data, p=2, dim=1)
 
         # motion recognition module
         self.motion_mixup = MotionAwareMixup(config).to(self.device)
 
         # Virtual class index tracking
         self.virtual_class_indices = {}
+
+        # Keep track of real classes vs virtual classes
+        self.num_real_classes = num_classes
 
     def forward(self, x, return_features=False):
         features = self.backbone(x)
@@ -35,33 +46,34 @@ class MICS(nn.Module):
 
         # Cosine similarity based classification
         logits = F.linear(F.normalize(features, p=2, dim=1),
-                         F.normalize(self.classifiers, p=2, dim=1))
-        return logits / 0.1  # temperature scaling
+                          F.normalize(self.classifiers, p=2, dim=1))
+        return logits / self.config.temperature  # temperature scaling
 
     def compute_midpoint_classifier(self, class1, class2):
-        """중간점 분류기 계산"""
-        # 입력이 텐서인 경우 정수로 변환
+        """Calculate midpoint classifier"""
+        # Convert tensor inputs to integers if needed
         if isinstance(class1, torch.Tensor):
             class1 = class1.item()
         if isinstance(class2, torch.Tensor):
             class2 = class2.item()
 
-        # 중간점 계산
+        # Calculate midpoint
         midpoint = (self.classifiers[class1] + self.classifiers[class2]) / 2
 
-        # 차원 확인 및 정규화
+        # Normalize the midpoint
+        midpoint = F.normalize(midpoint.unsqueeze(0), p=2, dim=1).squeeze(0)
+
+        # Ensure proper dimensionality
         if len(midpoint.shape) > 1:
-            # 이미 2차원 이상이면 첫 차원이 1인지 확인
             if midpoint.shape[0] != 1:
                 midpoint = midpoint.unsqueeze(0)
         else:
-            # 1차원이면 2차원으로 변환
             midpoint = midpoint.unsqueeze(0)
 
         return midpoint
 
     def compute_soft_label(self, lam, gamma):
-        # soft label policy
+        # Soft label policy
         # Original class probability
         prob_class1 = max((1 - gamma - lam) / (1 - gamma), 0)
         prob_class2 = max((lam - gamma) / (1 - gamma), 0)
@@ -73,128 +85,38 @@ class MICS(nn.Module):
 
     def manifold_mixup(self, x1, x2, y1, y2, session_idx):
         """
-        Manifold Mixup 수행 - 모델의 중간 레이어에서 특성을 혼합
-        x1, x2: 입력 이미지 샘플
-        y1, y2: 클래스 레이블
+        Perform Manifold Mixup - mix features in the middle layers
+        x1, x2: input image samples
+        y1, y2: class labels
         """
-        # 베타 분포에서 혼합 비율 샘플링
+        # Sample mixing ratio from beta distribution
         alpha = self.config.alpha
         lam = np.random.beta(alpha, alpha)
 
-        # 중간 레이어 선택 (ResNet의 경우 layer1, layer2, layer3, layer4 중 하나)
-        # ResNet20 또는 ResNet18의 내부 구조에 따라 접근 방식이 달라짐
-        if isinstance(self.backbone, ResNet20Backbone):
-            # ResNet20의 경우 내부 구조에 접근
-            # features는 Sequential이므로 layer별로 분리
-            layers = list(self.backbone.features.children())
+        # Extract features and apply mixup
+        mixed_features, soft_label = self._apply_mixup(x1, x2, y1, y2, lam)
 
-            # 첫 번째 부분 (입력 ~ 선택한 레이어까지)
-            layer_idx = np.random.randint(1, len(layers) - 1)  # 첫 레이어와 마지막 레이어 제외
-            first_part = nn.Sequential(*layers[:layer_idx])
+        return mixed_features, soft_label
 
-            # 두 번째 부분 (선택한 레이어 이후 ~ 출력)
-            second_part = nn.Sequential(*layers[layer_idx:])
+    def _apply_mixup(self, x1, x2, y1, y2, lam):
+        """Helper method to apply mixup based on backbone type"""
+        # Get integer class indices
+        y1_int = int(y1.item())
+        y2_int = int(y2.item())
 
-            # 첫 번째 부분을 통과하여 중간 레이어 특성 추출
-            h1 = first_part(x1)
-            h2 = first_part(x2)
+        # Class pair (ordered for consistency)
+        class_pair = (min(y1_int, y2_int), max(y1_int, y2_int))
 
-            # 중간 레이어에서 특성 혼합
-            h_mixed = lam * h1 + (1 - lam) * h2
-
-            # 두 번째 부분을 통과시켜 최종 특성 추출
-            mixed_features = second_part(h_mixed)
-            mixed_features = torch.flatten(mixed_features, 1)
-
-        elif isinstance(self.backbone, ResNet18Backbone) and len(x1.shape) == 5:
-            # 비디오 데이터의 경우 (ResNet18 with motion data)
-            B, C, T, H, W = x1.shape
-
-            # 각 프레임에 대해 별도로 처리
-            mixed_frame_features = []
-
-            # ResNet18의 레이어 분리
-            resnet_layers = list(self.backbone.features.children())
-            layer_idx = np.random.randint(1, len(resnet_layers) - 1)
-            first_part = nn.Sequential(*resnet_layers[:layer_idx])
-            second_part = nn.Sequential(*resnet_layers[layer_idx:])
-
-            for t in range(T):
-                # 각 프레임 추출
-                frame1 = x1[:, :, t]  # [B, C, H, W]
-                frame2 = x2[:, :, t]  # [B, C, H, W]
-
-                # 첫 번째 부분 통과
-                h1 = first_part(frame1)
-                h2 = first_part(frame2)
-
-                # 모션 인식이 활성화된 경우 광학 흐름 정보를 활용하여 혼합 비율 조정
-                if self.config.use_motion and t > 0:
-                    # t와 t-1 프레임 간의 광학 흐름 근사
-                    # 간단히 하기 위해 현재 프레임 차이를 사용
-                    frame_diff1 = torch.mean(torch.abs(x1[:, :, t] - x1[:, :, t - 1]))
-                    frame_diff2 = torch.mean(torch.abs(x2[:, :, t] - x2[:, :, t - 1]))
-
-                    # 모션의 정도에 따라 혼합 비율 조정
-                    motion_factor = torch.sigmoid(frame_diff1 - frame_diff2) * self.config.flow_alpha
-                    adjusted_lam = lam + motion_factor * (0.5 - lam)
-                    adjusted_lam = torch.clamp(adjusted_lam, 0.0, 1.0).item()
-                else:
-                    adjusted_lam = lam
-
-                # 중간 레이어에서 특성 혼합
-                h_mixed = adjusted_lam * h1 + (1 - adjusted_lam) * h2
-
-                # 두 번째 부분 통과
-                frame_features = second_part(h_mixed)
-                mixed_frame_features.append(frame_features)
-
-            # 모든 프레임 특성을 스택
-            stacked_features = torch.stack(mixed_frame_features, dim=2)  # [B, feat_dim, T, 1, 1]
-
-            # 시간 차원에 대해 평균
-            mixed_features = torch.mean(stacked_features, dim=2)  # [B, feat_dim, 1, 1]
-            mixed_features = torch.flatten(mixed_features, 1)  # [B, feat_dim]
-
-        else:
-            # 일반 이미지 데이터 (ResNet18)
-            resnet_layers = list(self.backbone.features.children())
-            layer_idx = np.random.randint(1, len(resnet_layers) - 1)
-            first_part = nn.Sequential(*resnet_layers[:layer_idx])
-            second_part = nn.Sequential(*resnet_layers[layer_idx:])
-
-            # 첫 번째 부분 통과
-            h1 = first_part(x1)
-            h2 = first_part(x2)
-
-            # 중간 레이어에서 특성 혼합
-            h_mixed = lam * h1 + (1 - lam) * h2
-
-            # 두 번째 부분 통과
-            mixed_features = second_part(h_mixed)
-            mixed_features = torch.flatten(mixed_features, 1)
-
-        # 소프트 라벨 계산
-        gamma = self.config.gamma
-        prob_1, prob_v, prob_2 = self.compute_soft_label(lam, gamma)
-
-        # 클래스 쌍에 대한 가상 클래스 인덱스 생성/검색
-        class_pair = (int(y1.item()), int(y2.item()))
+        # Create virtual class if needed
         if class_pair not in self.virtual_class_indices:
-            # 새 가상 클래스 인덱스 생성
+            # New virtual class index
             virtual_idx = len(self.classifiers)
             self.virtual_class_indices[class_pair] = virtual_idx
 
-            # 중간점 분류기 계산
-            midpoint = self.compute_midpoint_classifier(y1, y2)
+            # Calculate midpoint classifier
+            midpoint = self.compute_midpoint_classifier(y1_int, y2_int)
 
-            # 차원 맞추기
-            if len(midpoint.shape) != 2:
-                midpoint = midpoint.view(1, -1)  # 1차원이면 2차원으로 변환
-            elif len(midpoint.shape) == 2 and midpoint.shape[0] != 1:
-                midpoint = midpoint.unsqueeze(0)  # 첫 차원이 1이 아니면 차원 추가
-
-            # 분류기 확장
+            # Expand classifiers
             new_classifiers = nn.Parameter(
                 torch.cat([self.classifiers.data, midpoint], dim=0)
             ).to(self.device)
@@ -203,47 +125,95 @@ class MICS(nn.Module):
 
         virtual_idx = self.virtual_class_indices[class_pair]
 
-        # 소프트 라벨 생성
+        # Apply motion-aware mixup if enabled
+        if self.config.use_motion and isinstance(self.backbone, torch.nn.Module) and len(x1.shape) == 5:
+            # Video data processing
+            mixed_frames, adjusted_lam = self.motion_mixup(x1, x2, lam)
+
+            # Extract features from mixed frames
+            B, C, T, H, W = mixed_frames.shape
+            frame_features = []
+
+            for t in range(T):
+                frame = mixed_frames[:, :, t]
+                frame_feat = self.backbone.features(frame)
+                frame_features.append(frame_feat)
+
+            # Average over time dimension
+            stacked_features = torch.stack(frame_features, dim=2)
+            avg_features = torch.mean(stacked_features, dim=2)
+            mixed_features = torch.flatten(avg_features, 1)
+
+            lam = adjusted_lam
+        else:
+            # Standard image processing
+            # Select a random layer for mixup
+            if hasattr(self.backbone, 'features'):
+                layers = list(self.backbone.features.children())
+                layer_idx = np.random.randint(1, len(layers) - 1)
+
+                # Forward to middle layer
+                h1 = x1
+                h2 = x2
+                for j in range(layer_idx):
+                    h1 = layers[j](h1)
+                    h2 = layers[j](h2)
+
+                # Mix features
+                h_mixed = lam * h1 + (1 - lam) * h2
+
+                # Continue forward pass
+                for j in range(layer_idx, len(layers)):
+                    h_mixed = layers[j](h_mixed)
+
+                mixed_features = torch.flatten(h_mixed, 1)
+            else:
+                # Fallback to standard feature extraction
+                with torch.no_grad():
+                    feat1 = self.backbone(x1)
+                    feat2 = self.backbone(x2)
+
+                mixed_features = lam * feat1 + (1 - lam) * feat2
+
+        # Calculate soft labels
+        gamma = self.config.gamma
+        prob_1, prob_v, prob_2 = self.compute_soft_label(lam, gamma)
+
+        # Create soft label tensor
         soft_label = torch.zeros(len(self.classifiers), device=self.device)
-        soft_label[y1] = prob_1
-        soft_label[y2] = prob_2
+        soft_label[y1_int] = prob_1
+        soft_label[y2_int] = prob_2
         soft_label[virtual_idx] = prob_v
 
         return mixed_features, soft_label
 
     def cleanup_virtual_classifiers(self, num_real_classes):
-        """증분 학습 후 가상 분류기 제거"""
-        # 실제 클래스에 대한 분류기만 유지
+        """Remove virtual classifiers after training"""
+        # Store the updated number of real classes
+        self.num_real_classes = num_real_classes
+
+        # Keep only real class classifiers (not virtual ones)
         self.classifiers = nn.Parameter(self.classifiers[:num_real_classes].clone())
-        self.virtual_class_indices = {}  # 가상 클래스 인덱스 초기화
-    
-# Optical flow function
-def compute_optical_flow(frames):
-    # Input
-    B, C, T, H, W = frames.shape
-    flows = torch.zeros(B, 2, T-1, H, W, device=frames.device)
 
-    # Process each item in the batch
-    for b in range(B):
-        for t in range(T-1):
-            # Convert to NumPy array
-            prev_frame = frames[b, :, t].permute(1, 2, 0).cpu().numpy()
-            next_frame = frames[b, :, t+1].permute(1, 2, 0).cpu().numpy()
+        # Reset virtual class indices
+        self.virtual_class_indices = {}
 
-            # Convert to grayscale
-            prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_RGB2GRAY)
-            next_gray = cv2.cvtColor(next_frame, cv2.COLOR_RGB2GRAY)
+    def expand_classifier(self, novel_classes):
+        """Properly expand classifier for new classes"""
+        # Initialize new classifiers with proper normalization
+        new_class_vectors = torch.randn(novel_classes, self.config.feature_dim).to(self.device)
+        new_class_vectors = F.normalize(new_class_vectors, p=2, dim=1)
 
-            # Compute optical flow (Farneback)
-            flow = cv2.calcOpticalFlowFarneback(prev_gray, next_gray, None,0.5, 3, 15, 3, 5, 1.2, 0)
+        # Concatenate with existing classifiers
+        expanded_classifiers = nn.Parameter(
+            torch.cat([self.classifiers.data, new_class_vectors], dim=0)
+        )
 
-            # Convert x, y direction flow to tensor
-            flows[b, 0, t] = torch.from_numpy(flow[:, :, 0]).to(frames.device)
-            flows[b, 1, t] = torch.from_numpy(flow[:, :, 1]).to(frames.device)
+        self.classifiers = expanded_classifiers
+        self.num_real_classes += novel_classes
 
-    return flows
 
-# Mix-up for Motion awareness
+# Motion-aware mixup implementation
 class MotionAwareMixup(nn.Module):
     def __init__(self, config):
         super(MotionAwareMixup, self).__init__()
@@ -251,11 +221,11 @@ class MotionAwareMixup(nn.Module):
         self.flow_alpha = config.flow_alpha
 
     def compute_motion_consistency(self, flow1, flow2, lam):
-        # Computing optical flow coherence of two samples
-        # Calculating cosine similarity of two streams
+        # Computing optical flow coherence between two samples
         flow1_flat = flow1.reshape(2, -1)
         flow2_flat = flow2.reshape(2, -1)
 
+        # Calculate magnitudes
         norm1 = torch.norm(flow1_flat, dim=1, keepdim=True)
         norm2 = torch.norm(flow2_flat, dim=1, keepdim=True)
 
@@ -263,30 +233,61 @@ class MotionAwareMixup(nn.Module):
         epsilon = 1e-8
         cos_sim = torch.sum(flow1_flat * flow2_flat, dim=1) / (norm1 * norm2 + epsilon)
 
-        # Consistency score: The higher the similarity, the closer the lam is to 0.5
+        # Consistency score: higher similarity -> closer to 0.5 (balanced mixing)
         consistency = torch.mean(cos_sim)
         adjusted_lam = lam + self.flow_alpha * (0.5 - lam) * consistency
 
-        # Clipping to the range [0, 1]
+        # Clamp to valid range
         adjusted_lam = torch.clamp(adjusted_lam, 0.0, 1.0)
 
         return adjusted_lam.item()
 
     def forward(self, frames1, frames2, lam):
-        # Conduct motion aware mix-up
+        # Skip motion awareness if disabled
         if not self.config.use_motion:
-            # Perform basic mix-up when motion detection is disabled
             mixed_frames = lam * frames1 + (1 - lam) * frames2
             return mixed_frames, lam
 
-        # Optical flow calculation
+        # Compute optical flow
         flow1 = compute_optical_flow(frames1)
         flow2 = compute_optical_flow(frames2)
 
-        # Motion consistency based blend ratio adjustment
+        # Adjust mixing ratio based on motion consistency
         adjusted_lam = self.compute_motion_consistency(flow1[0], flow2[0], lam)
 
-        # Mix up with adjusted ratio
+        # Apply adjusted mixing
         mixed_frames = adjusted_lam * frames1 + (1 - adjusted_lam) * frames2
 
         return mixed_frames, adjusted_lam
+
+
+# Optical flow computation function
+def compute_optical_flow(frames):
+    # Input processing
+    B, C, T, H, W = frames.shape
+    flows = torch.zeros(B, 2, T - 1, H, W, device=frames.device)
+
+    # Process each batch item
+    for b in range(B):
+        for t in range(T - 1):
+            # Convert to NumPy for OpenCV processing
+            prev_frame = frames[b, :, t].permute(1, 2, 0).detach().cpu().numpy()
+            next_frame = frames[b, :, t + 1].permute(1, 2, 0).detach().cpu().numpy()
+
+            # Convert to grayscale
+            prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_RGB2GRAY)
+            next_gray = cv2.cvtColor(next_frame, cv2.COLOR_RGB2GRAY)
+
+            # Compute flow (with error handling)
+            try:
+                flow = cv2.calcOpticalFlowFarneback(prev_gray, next_gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+
+                # Convert to tensor
+                flows[b, 0, t] = torch.from_numpy(flow[:, :, 0]).to(frames.device)
+                flows[b, 1, t] = torch.from_numpy(flow[:, :, 1]).to(frames.device)
+            except Exception as e:
+                print(f"Error in optical flow calculation: {e}")
+                # Provide zeros as fallback
+                flows[b, :, t] = 0
+
+    return flows
