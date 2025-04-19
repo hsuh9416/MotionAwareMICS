@@ -1,9 +1,10 @@
 # Ignore data files
 /data/index_list/cifar100/*
 /data/ucfTrainTestlist/*
-/data/UTF101/*
+/data/UCF101/*
+/data/kaggle.json
 
 # Exception (placeholder)
 !/data/index_list/cifar100/placeholder.txt
 !/data/ucfTrainTestlist/placeholder.txt
-!/data/UTF101/placeholder.txt
+!/data/UCF101/placeholder.txt
