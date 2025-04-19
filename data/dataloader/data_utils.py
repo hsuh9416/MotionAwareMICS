@@ -1,27 +1,34 @@
+# MIT License
+#
+# Copyright (c) 2023 Solang Kim
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+# This function is based on the code from https://github.com/solangii/MICS
+# with modifications to adapt it to the Motion-Aware MICS implementation
+
 import numpy as np
 import torch
-from torch.utils.data import Dataset
-
+import data.dataloader.cifar100.cifar as Dataset
 
 def set_up_datasets(args):
     if args.dataset == 'cifar100':
-        import data.dataloader.cifar100.cifar as Dataset
-        args.base_class = 60
-        args.num_classes = 100
-        args.way = 5
-        args.shot = 5
-        args.sessions = 9
-        args.Dataset = Dataset
-    if args.dataset == 'cub200':
-        import data.dataloader.cub200.cub200 as Dataset
-        args.base_class = 100
-        args.num_classes = 200
-        args.way = 10
-        args.shot = 5
-        args.sessions = 11
-        args.Dataset = Dataset
-    if args.dataset == 'mini_imagenet':
-        import data.dataloader.miniimagenet.miniimagenet as Dataset
         args.base_class = 60
         args.num_classes = 100
         args.way = 5
@@ -29,7 +36,6 @@ def set_up_datasets(args):
         args.sessions = 9
         args.Dataset = Dataset
     return args
-
 
 def get_dataloader(args, session):
     if session == 0:
