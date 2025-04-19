@@ -1,11 +1,15 @@
-# Import necessary library
+# Import necessary libraries
 import torch
+from torch.cuda.amp import autocast, GradScaler
+import multiprocessing
 
 # Config class
 class Config:
     # Default
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    num_workers = 4 # Parallel workers
+
+    # Increase dataloader workers based on virtual CPU count
+    num_workers = multiprocessing.cpu_count() * 2
 
     # Dataset
     dataset = 'cifar100'  # Plain: 'cifar100' Motion-aware: 'ucf101'
