@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 
 # User-defined
 from config import Config
+from test_config import TestConfig
 from mics_impl import MICS
 from dataloader import load_cifar100, load_ucf101
 from evaluate import evaluate, compute_nVar, visualize_pca, visualize_nVar, visualize_acc
@@ -99,30 +100,30 @@ def run_mics(config):
 
 
 # Main function
-def main():
+def main(isTest):
     # Set seed
     set_seed(1)
 
     # Call pre-set config
-    config = Config()
+    config = TestConfig() if isTest else Config()
 
     # Setup directory for result saving
     if os.path.exists('results'):
         shutil.rmtree('results')
     os.makedirs('results')
 
-    # # Plain MICS
-    # print("=" * 50)
-    # print("Running Plain MICS algorithm...")
-    # print("=" * 50)
-    # model_plain, nVar_plain, acc_plain = run_mics(config)
-    #
-    # # Save checkpoints (back up intermediate results)
-    # torch.save({
-    #     'model_state_dict': model_plain.state_dict(),
-    #     'nVar': nVar_plain,
-    #     'accuracy': acc_plain
-    # }, 'results/plain_mics_checkpoint.pth')
+    # Plain MICS
+    print("=" * 50)
+    print("Running Plain MICS algorithm...")
+    print("=" * 50)
+    model_plain, nVar_plain, acc_plain = run_mics(config)
+
+    # Save checkpoints (back up intermediate results)
+    torch.save({
+        'model_state_dict': model_plain.state_dict(),
+        'nVar': nVar_plain,
+        'accuracy': acc_plain
+    }, 'results/plain_mics_checkpoint.pth')
 
     print("\n" + "=" * 50)
     print("Running Motion-Aware MICS algorithm...")
