@@ -1,0 +1,1 @@
+This folder contains the dataset related to UCF-101. Please note that it was not uploaded due to size limitations.
