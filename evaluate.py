@@ -10,6 +10,9 @@ def evaluate(model, test_loaders, config):
     model.eval()
     acc_per_session = []
 
+    if len(test_loaders) > 0:
+        print("Base session evaluation:")
+
     with torch.no_grad():
         # Evaluate all sessions
         for session_idx, test_loader in enumerate(test_loaders):

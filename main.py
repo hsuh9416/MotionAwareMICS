@@ -87,14 +87,9 @@ def run_mics(config):
         )
 
         # Evaluation
-        acc_per_session = evaluate(
-            model, test_loaders[:session_idx+1], config)
-        nVar = compute_nVar(
-            model, test_loaders[:session_idx+1], current_classes, config
-        )
-        visualize_pca(
-            model, test_loaders[:session_idx+1], current_classes, config, session_idx
-        )
+        acc_per_session = evaluate(model, test_loaders[:session_idx+1], config)
+        nVar = compute_nVar(model, test_loaders[:session_idx+1], current_classes, config)
+        visualize_pca(model, test_loaders[:session_idx+1], current_classes, config, session_idx)
 
     return model, nVar, acc_per_session
 
