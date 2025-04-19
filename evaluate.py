@@ -152,7 +152,7 @@ def visualize_pca(model, test_loaders, current_classes, config, session_idx):
     plt.ylabel('PC2')
     plt.legend(loc='upper right', bbox_to_anchor=(1.3, 1), ncol=2)
     plt.tight_layout()
-    plt.savefig(f'pca_session_{session_idx}.png', dpi=300)
+    plt.savefig(f'/content/drive/MyDrive/MotionAwareMICS/results/pca_session_{session_idx}.png', dpi=300)
     plt.close()
 
 # nVAR visualization function
@@ -167,7 +167,7 @@ def visualize_nVar(nVar_plain, nVar_motion, config):
     plt.ylabel('Normalized Variance (nVAR)')
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.legend()
-    plt.savefig('results/nvar_comparison.png', dpi=300)
+    plt.savefig('/content/drive/MyDrive/MotionAwareMICS/results/nvar_comparison.png', dpi=300)
 
 # Accuracy visualization function
 def visualize_acc(history_plain, history_motion, config):
@@ -233,7 +233,7 @@ def visualize_acc(history_plain, history_motion, config):
     plt.tight_layout()
 
     # Save results
-    plt.savefig('results/performance_dropping_rate.png', dpi=300)
+    plt.savefig('/content/drive/MyDrive/MotionAwareMICS/results/performance_dropping_rate.png', dpi=300)
 
     # Compare final accuracy
     plt.figure(figsize=(8, 6))
@@ -254,4 +254,4 @@ def visualize_acc(history_plain, history_motion, config):
     plt.tight_layout()
 
     # Save results
-    plt.savefig('results/final_accuracy_comparison.png', dpi=300)
+    plt.savefig('/content/drive/MyDrive/MotionAwareMICS/results/final_accuracy_comparison.png', dpi=300)
