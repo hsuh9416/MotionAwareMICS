@@ -1,7 +1,7 @@
 # Import necessary libraries
 import torch
 import multiprocessing
-
+import data.dataloader.cifar100.cifar as Dataset
 # Config class
 class Config:
     # Default
@@ -10,12 +10,14 @@ class Config:
     # Increase dataloader workers based on virtual CPU count
     num_workers = min(multiprocessing.cpu_count() * 2, 12)
 
-    # Dataset
+    # Dataset(Default: CIFAR-100)
     dataset = 'cifar100'  # Plain: 'cifar100' Motion-aware: 'ucf101'
-    base_classes = 60     # Follows standard FSCIL protocol. base: increment = 60: 40
-    novel_classes_per_session = 5  # Number of new classes per session
-    num_sessions = 8      # 40/5 = 8 sessions
-    shots_per_class = 5   # 5-shot
+    base_class = 60     # Follows standard FSCIL protocol. base: increment = 60: 40
+    num_classes = 100 # Total number of classes
+    way = 5
+    shots = 5
+    sessions = 9
+    Dataset = Dataset
 
     # Feature Extractor
     backbone = 'resnet20' # Feature Extractor
