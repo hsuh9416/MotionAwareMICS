@@ -5,12 +5,12 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 
-# 평가 함수
-def evaluate(model, test_loaders, config):
+# Evaluation function
+def evaluate(model, test_loaders, config, session):
     model.eval()
     acc_per_session = []
 
-    if len(test_loaders) > 0:
+    if session == 0: # First session
         print("Base session evaluation:")
 
     with torch.no_grad():
@@ -54,7 +54,7 @@ def compute_nVar(model, test_loaders, current_classes, config):
 
                 for i in range(inputs.size(0)):
                     class_idx = targets[i].item()
-                    if class_idx < current_classes:  # 현재까지 학습한 클래스만 고려
+                    if class_idx < current_classes:  # Consider only the classes learned so far
                         class_features[class_idx].append(features[i].cpu().numpy())
 
     # class-centric calculation

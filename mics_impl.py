@@ -6,7 +6,6 @@ import numpy as np
 import cv2
 from feature_extractor import ResNet20Backbone, ResNet18Backbone
 
-
 class MICS(nn.Module):
     def __init__(self, config, num_classes):
         super(MICS, self).__init__()

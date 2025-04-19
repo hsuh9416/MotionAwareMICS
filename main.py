@@ -43,7 +43,7 @@ def run_mics(config):
     model = train_base(model, trainloader, config)
 
     # Evaluate base session
-    acc_per_session = evaluate(model, [testloader], config)
+    acc_per_session = evaluate(model, [testloader], config, 0)
     acc_history.extend(acc_per_session)
 
     nVar = compute_nVar(model, [testloader], current_classes, config)
@@ -80,7 +80,7 @@ def run_mics(config):
         model = train_inc(model, trainloader, session_idx, current_classes, config)
 
         # Evaluate on all classes seen so far
-        acc_per_session = evaluate(model, test_loaders, config)
+        acc_per_session = evaluate(model, test_loaders, config, session_idx)
         acc_history.append(acc_per_session[-1])  # Store accuracy for current session
 
         nVar = compute_nVar(model, test_loaders, current_classes, config)
