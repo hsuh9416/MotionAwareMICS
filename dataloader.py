@@ -29,9 +29,22 @@ import torchvision.transforms as transforms
 from torch.utils.data import Subset
 
 from config import Config
-import data.dataloader.cifar100.cifar as Dataset
+from data.dataloader.data_utils import set_up_datasets, get_dataloader
 
-def load_cifar100(base_classes, novel_classes_per_session, num_sessions):
+# Argument set-up for dataloader configuration
+class Args:
+    def __init__(self, config):
+        self.dataset = config.dataset
+        self.dataroot = config.dataroot
+        self.batch_size_base = config.batch_size
+        self.batch_size_new = getattr(config, 'batch_size_new', 0)
+        self.test_batch_size = getattr(config, 'test_batch_size', config.batch_size)
+        self.num_workers = config.num_workers
+        self.drop_last = getattr(config, 'drop_last', False)
+        self.train = getattr(config, 'train', 'vanilla')
+        self.is_autoaug = getattr(config, 'is_autoaug', False)
+
+def load_cifar100(config):
     """
     Load and preprocess CIFAR-100 dataset for Few-Shot Class Incremental Learning (FSCIL).
     This function divides the dataset into base session and incremental sessions based on the given parameters.
@@ -52,19 +65,9 @@ def load_cifar100(base_classes, novel_classes_per_session, num_sessions):
     Returns:
         tuple: (sessions_train_data, sessions_test_data) where each element is a list of datasets for each session
     """
-    # Data augmentation and preprocessing for training
-    transform_train = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
-    ])
 
-    # Preprocessing for testing (no augmentation)
-    transform_test = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
-    ])
+    # Load Config
+    arg = Args(config)
 
     # Load datasets
     trainset = torchvision.datasets.CIFAR100(root='./data', train=True,

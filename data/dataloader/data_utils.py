@@ -58,18 +58,6 @@ def get_base_dataloader(args):
         testset = args.Dataset.CIFAR100(root=args.dataroot, train=False, download=False,
                                         index=class_index, base_sess=True, autoaug=is_autoaug)
 
-    if args.dataset == 'cub200':
-        trainset = args.Dataset.CUB200(root=args.dataroot, train=True,
-                                       index=class_index, base_sess=True, autoaug=is_autoaug)
-        testset = args.Dataset.CUB200(root=args.dataroot, train=False,
-                                      index=class_index, autoaug=is_autoaug)
-
-    if args.dataset == 'mini_imagenet':
-        trainset = args.Dataset.MiniImageNet(root=args.dataroot, train=True,
-                                             index=class_index, base_sess=True, autoaug=is_autoaug)
-        testset = args.Dataset.MiniImageNet(root=args.dataroot, train=False,
-                                            index=class_index, autoaug=is_autoaug)
-
     trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=args.batch_size_base, shuffle=True,
                                               num_workers=8, pin_memory=True, drop_last=args.drop_last)
     testloader = torch.utils.data.DataLoader(dataset=testset, batch_size=args.test_batch_size, shuffle=False,
@@ -84,12 +72,7 @@ def get_new_dataloader(args, session):
         class_index = open(txt_path).read().splitlines()
         trainset = args.Dataset.CIFAR100(root=args.dataroot, train=True, download=False,
                                          index=class_index, base_sess=False)
-    if args.dataset == 'cub200':
-        trainset = args.Dataset.CUB200(root=args.dataroot, train=True,
-                                       index_path=txt_path)
-    if args.dataset == 'mini_imagenet':
-        trainset = args.Dataset.MiniImageNet(root=args.dataroot, train=True,
-                                             index_path=txt_path)
+
     if args.batch_size_new == 0:
         batch_size_new = trainset.__len__()
         trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=batch_size_new, shuffle=False,
@@ -104,12 +87,6 @@ def get_new_dataloader(args, session):
     if args.dataset == 'cifar100':
         testset = args.Dataset.CIFAR100(root=args.dataroot, train=False, download=False,
                                         index=class_new, base_sess=False)
-    if args.dataset == 'cub200':
-        testset = args.Dataset.CUB200(root=args.dataroot, train=False,
-                                      index=class_new)
-    if args.dataset == 'mini_imagenet':
-        testset = args.Dataset.MiniImageNet(root=args.dataroot, train=False,
-                                            index=class_new)
 
     testloader = torch.utils.data.DataLoader(dataset=testset, batch_size=args.test_batch_size, shuffle=False,
                                              num_workers=args.num_workers, pin_memory=True)
