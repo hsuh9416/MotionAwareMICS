@@ -1,35 +1,38 @@
+# Import necessary library
 import torch
 
-# 설정 클래스
+# Config class
 class Config:
-    # 기본 설정
+    # Default
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    num_workers = 4
+    num_workers = 4 # Parallel workers
 
-    # 데이터셋 설정
-    dataset = 'cifar100'  # 'cifar100' 또는 'kinetics'
-    base_classes = 60     # 기본 클래스 수
-    novel_classes_per_session = 5  # 세션당 새로운 클래스 수
-    num_sessions = 8      # 증분 세션 수
-    shots_per_class = 5   # 각 증분 클래스당 샘플 수
+    # Dataset
+    dataset = 'cifar100'  # Plain: 'cifar100' Motion-aware: 'ucf101'
+    base_classes = 60     # Follows standard FSCIL protocol. base: increment = 60: 40
+    novel_classes_per_session = 5  # Number of new classes per session
+    num_sessions = 8      # 40/5 = 8 sessions
+    shots_per_class = 5   # 5-shot
 
-    # 모델 설정
-    backbone = 'resnet18'
-    feature_dim = 512     # ResNet18의 특성 벡터 차원
+    # Feature Extractor
+    backbone = 'resnet20' # Feature Extractor - backbone as resnet20
+    feature_dim = 64     # Feature Vector Dimension for resnet20
 
-    # 훈련 설정
-    batch_size = 128
-    base_epochs = 100
-    inc_epochs = 10
-    learning_rate = 0.1
-    momentum = 0.9
-    weight_decay = 5e-4
+    # Training - Same as the paper
+    batch_size = 128 # High capacity fits with A100 GPU
+    base_epochs = 100 # Base session epoch number
+    inc_epochs = 10 # Incremental session epoch number
+    learning_rate = 0.1 # Initial learning rate
+    momentum = 0.9 # SGD momentum value
+    weight_decay = 5e-4 # Weight decay (normalization)
+    temperature = 0.1 # Cosine similarity temperature scaling (mentioned in the paper)
 
-    # MICS 설정
-    alpha = 1.0  # 베타 분포의 파라미터
-    gamma = 0.4  # 소프트 라벨링 정책의 파라미터
-    epsilon = 0.3  # 증분 단계에서 업데이트할 파라미터의 비율
+    # MICS settings - based on Table 4 (Section 4.5) of the paper
+    # CIFAR-100(Best practice)
+    alpha = 0.5  # Parameters of the beta distribution
+    gamma = 0.5  # Parameters of soft labeling policy
+    epsilon = 0.01  # The percentage of parameters to update in incremental steps
 
-    # 모션 인식 설정
-    use_motion = False  # 모션 인식 기능 활성화 여부
-    flow_alpha = 0.5    # 광학 흐름 가중치
+    # Motion recognition settings
+    use_motion = False  # Whether motion recognition function is enabled
+    flow_alpha = 0.5    # optical flow weighting
