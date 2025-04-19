@@ -8,7 +8,6 @@ import torch.nn as nn
 
 # Import user-defined modules
 from config import Config
-from test_config import TestConfig
 from data.dataloader.data_utils import set_up_datasets, get_dataloader
 from mics_impl import MICS  # Using our fixed implementation
 from evaluate import evaluate, compute_nVar, visualize_pca, visualize_nVar, visualize_acc
@@ -98,7 +97,7 @@ def main(isTest):
     set_seed(1)
 
     # Call pre-set config
-    config = TestConfig() if isTest else Config()
+    config = Config()
 
     # Setup directory for result saving
     results_dir = '/content/drive/MyDrive/MotionAwareMICS/results'
