@@ -58,7 +58,7 @@ def run_mics(config):
         # load incremental dataset
         trainset, trainloader, testloader = get_dataloader(config, session_idx)
 
-        # Create list of all test loaders up to current session for evaluation
+        # Create list of all test loaders up to the current session for evaluation
         test_loaders = []
         for s in range(session_idx + 1):
             _, _, testloader_s = get_dataloader(config, s)

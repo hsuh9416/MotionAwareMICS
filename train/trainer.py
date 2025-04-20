@@ -46,33 +46,13 @@ class Averager():
     def item(self):
         return self.v
 
-class MICSTrainer():
+class MICSTrainer:
     def __init__(self, args):
         super().__init__(args)
         self.args = args
         self.args = set_up_datasets(self.args)
-
-        # train statistics
-        self.trlog = {}
-        self.trlog['train_loss'] = []
-        self.trlog['val_loss'] = []
-        self.trlog['test_loss'] = []
-        self.trlog['proto_loss'] = []
-        self.trlog['optimal_loss'] = []
-        self.trlog['train_acc'] = []
-        self.trlog['val_acc'] = []
-        self.trlog['test_acc'] = []
-        self.trlog['max_acc_epoch'] = 0
-        self.trlog['max_acc'] = [0.0] * args.sessions
-        self.trlog['r2m_val_loss'] = np.zeros([args.sessions])
-        self.trlog['r2m_proto_loss'] = np.zeros([args.sessions])
-        if ('cos' in args.model_dir) or ('dot' in args.model_dir):
-            self.args.full_fc = True
-        self.set_save_path()
-        self.args = set_up_datasets(self.args)
-        self.set_up_model()
-        self.set_acc_table(self.args)
-        pass
+        self.model = MICS(self.args).to(self.args.device)
+        self.results = self.set_acc_table(self.args)
 
     def replace_base_fc(self, trainset, transform, model, args):
         # replace fc.weight with the embedding average of train data
@@ -115,9 +95,8 @@ class MICSTrainer():
         self.args.save_path = '%s/' % self.args.dataset
         self.args.save_path = self.args.save_path + '%s/%s/' % (self.args.project, self.args.phase)
         self.args.save_path = self.args.save_path + '%s/' % mode
-
-        self.args.save_path = self.args.save_path + '-T_%.2f' % (self.args.temperature)
-
+        if 'cos' in mode:
+            self.args.save_path = self.args.save_path + '-T_%.2f' % (self.args.temperature)
         if 'ft' in self.args.new_mode:
             self.args.save_path = self.args.save_path + '-ftLR_%.3f-ftEpoch_%d' % (
                 self.args.lr_new, self.args.epochs_new)
@@ -125,13 +104,14 @@ class MICSTrainer():
 
         self.args.save_path = os.path.join('results', self.args.save_path)
         ensure_path(self.args.save_path)
+        return None
 
     def set_up_model(self):
-        # Initialize model with base classes
-        self.model = MICS(self.args).to(self.args.device)
+        self.model = MICS(self.args)
+        self.model = self.model.cuda()
 
         if self.args.model_dir != None:
-            print('Loading init parameters from: %s' % self.args.model_dir)
+            print(f'Loading init parameters from: {self.args.model_dir}')
             self.best_model_dict = dict()
 
             try:
@@ -147,22 +127,24 @@ class MICSTrainer():
                         if 'shortcut' in temp_key:
                             temp_key = temp_key.replace('shortcut', 'downsample')
                         self.best_model_dict[temp_key] = value
-            self.best_model_dict['module.fc.weight'] = self.model.fc.weight
+            self.best_model_dict['module.fc.weight'] = self.model.module.fc.weight
 
         else:
             raise ValueError('You must initialize a pre-trained model')
 
     def set_acc_table(self, args):
-        self.results = {}
-        self.results["acc"] = np.zeros([args.sessions])
-        self.results["acc_base"] = np.zeros([args.sessions])
-        self.results["acc_novel"] = np.zeros([args.sessions])
-        self.results["acc_old"] = np.zeros([args.sessions])
-        self.results["acc_new"] = np.zeros([args.sessions])
-        self.results["acc_base2"] = np.zeros([args.sessions])
-        self.results["acc_novel2"] = np.zeros([args.sessions])
-        self.results["acc_old2"] = np.zeros([args.sessions])
-        self.results["acc_new2"] = np.zeros([args.sessions])
+        results = dict()
+        results["acc"] = np.zeros([args.sessions])
+        results["acc_base"] = np.zeros([args.sessions])
+        results["acc_novel"] = np.zeros([args.sessions])
+        results["acc_old"] = np.zeros([args.sessions])
+        results["acc_new"] = np.zeros([args.sessions])
+        results["acc_base2"] = np.zeros([args.sessions])
+        results["acc_novel2"] = np.zeros([args.sessions])
+        results["acc_old2"] = np.zeros([args.sessions])
+        results["acc_new2"] = np.zeros([args.sessions])
+
+        return results
 
     def get_logits(self, x, fc):
         """A function that calculates the raw score (logit) to be used as a classification result."""
@@ -177,8 +159,8 @@ class MICSTrainer():
         return x
 
     def get_optimizer_new(self):
-        optimizer = torch.optim.SGD([{'params': self.model.encoder.parameters(), 'lr': self.args.lr_new},
-                                     {'params': self.model.fc.parameters(), 'lr': self.args.lr_cf}],
+        optimizer = torch.optim.SGD([{'params': self.model.encoder.parameters(), 'lr': self.args.learning_rate},
+                                     {'params': self.model.fc.parameters(), 'lr': 0}],
                                     momentum=0.9, nesterov=True, weight_decay=self.args.decay)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=self.args.step, gamma=self.args.gamma)
         return optimizer, scheduler
@@ -264,7 +246,7 @@ class MICSTrainer():
             self.trlog['max_acc'][session] = float('%.3f' % (tsa * 100))
             save_model_dir = os.path.join(args.save_path, 'session' + str(session + 1) + '_max_acc.pth')
             torch.save(dict(params=self.model.state_dict()), save_model_dir)
-            self.best_model_dict = deepcopy(self.model.state_dict())
+
             print('Test acc = {:.2f}%'.format(self.trlog['max_acc'][session]))
 
         args.save_path = os.path.join(args.save_path, 'last_session.pth')

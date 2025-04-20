@@ -75,7 +75,8 @@ class MICS(nn.Module):
             features = torch.flatten(features, 1)
 
         # Feature extraction and Mix-up processing via encoder
-        x, new_labels, mix_label_mask = self.encoder(x, labels,
+        x, new_labels, mix_label_mask = self.encoder(x,
+                                                     labels=labels,
                                                      mixup_alpha=args.mixup_alpha,
                                                      num_base_classes=cur_num_class,
                                                      gamma=args.gamma)
