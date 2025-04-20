@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import cv2
 
-from feature_extractor import resnet18, resnet20
+from model.resnet import resnet18, resnet20
 
 class MICS(nn.Module):
     def __init__(self, config):
