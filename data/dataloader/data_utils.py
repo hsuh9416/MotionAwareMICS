@@ -48,6 +48,7 @@ def set_up_datasets(args):
         args.frames_per_clip = 16  # Number of frames per video clip
         args.step_between_clips = 8  # Step size between clips
         args.fold = 1  # Which fold to use (1, 2, or 3)
+        args.inc_learning_rate = 0.0005  # In the paper
     return args
 
 def get_dataloader(args, session):
