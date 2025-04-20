@@ -14,10 +14,13 @@ class Config:
         self.dataroot = '/content/drive/MyDrive/MotionAwareMICS/data/' # Colab
 
         # Training - Same as the paper
+        self.base_mode = 'ft_cos'
+        self.new_mode = 'avg_cos'
         self.batch_size = 128 # High-capacity fits with A100 GPU
         self.base_epochs = 100 # Base session epoch number
         self.inc_epochs = 10 # Incremental session epoch number
         self.learning_rate = 0.1 # Initial learning rate
+        self.inc_learning_rate = 0.1  # Initial learning rate
         self.momentum = 0.9 # SGD momentum value
         self.weight_decay = 5e-4 # Weight decay (normalization)
         self.temperature = 0.1 # Cosine similarity temperature scaling (mentioned in the paper)
