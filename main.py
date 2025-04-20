@@ -9,7 +9,7 @@ import torch.nn as nn
 # Import user-defined modules
 from config import Config
 from data.dataloader.data_utils import set_up_datasets, get_dataloader
-from mics_impl import MICS  # Using our fixed implementation
+from model.mics import MICS  # Using our fixed implementation
 from evaluate import evaluate, compute_nVar, visualize_pca, visualize_nVar, visualize_acc
 from train import train_base, train_inc  # Using our fixed training functions
 
