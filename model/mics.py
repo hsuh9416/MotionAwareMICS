@@ -16,10 +16,10 @@ class MICS(nn.Module):
 
         # Feature Extractor
         if config.dataset == 'cifar100':
-            self.encoder = resnet20(num_classes=self.args.num_classes)
+            self.encoder = resnet20()
             self.num_features = 64
         else:  # Motion dataset 'ucf101'
-            self.encoder = resnet18(cnum_classes=self.args.num_classes)
+            self.encoder = resnet18()
             self.num_features = 512
 
         # Init classifier
@@ -28,7 +28,7 @@ class MICS(nn.Module):
 
     def encode(self, x):
         """ Encoding: x(Tensor): [B, C, H, W] -> [B, C', H', W'] -> [B, C', 1, 1] -> [B, C']"""
-        x = self.encoder(x) # Apply feature extractor to extract feature map
+        x = self.encoder(x) # Apply feature extractor to extract a feature map
         x = F.adaptive_avg_pool2d(x, 1) # Reduced to (1,1) spatial size by averaging each channel
         x = x.squeeze(-1).squeeze(-1) # 4D -> 2D
         return x # Embedded feature vector
