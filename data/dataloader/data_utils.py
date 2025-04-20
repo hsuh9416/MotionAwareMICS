@@ -49,14 +49,12 @@ def set_up_datasets(args):
         args.fold = 1  # Which fold to use (1, 2, or 3)
     return args
 
-
 def get_dataloader(args, session):
     if session == 0:
         trainset, trainloader, testloader = get_base_dataloader(args)
     else:
         trainset, trainloader, testloader = get_new_dataloader(args, session)
     return trainset, trainloader, testloader
-
 
 def get_base_dataloader(args):
     class_index = np.arange(args.base_class)
@@ -89,7 +87,6 @@ def get_base_dataloader(args):
                                              num_workers=args.num_workers, pin_memory=True)
 
     return trainset, trainloader, testloader
-
 
 def get_new_dataloader(args, session):
     if args.dataset == 'cifar100':
@@ -135,7 +132,6 @@ def get_new_dataloader(args, session):
                                              num_workers=args.num_workers, pin_memory=True)
 
     return trainset, trainloader, testloader
-
 
 def get_session_classes(args, session):
     class_list = np.arange(args.base_class + session * args.way)

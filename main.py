@@ -27,7 +27,7 @@ def set_seed(seed=42):
 # Function to execute the entire MICS algorithm
 def run_mics(config):
     # Initialize model with base classes
-    model = MICS(config, config.base_classes).to(config.device)
+    model = MICS(config).to(config.device)
 
     # Base session Evaluation
     current_classes = config.base_classes
@@ -92,7 +92,7 @@ def run_mics(config):
 
 
 # Main function
-def main(isTest):
+def main():
     # Set seed for reproducibility
     set_seed(1)
 
@@ -113,7 +113,6 @@ def main(isTest):
     # Ensure proper configuration for plain MICS
     config.dataset = 'cifar100'
     config = set_up_datasets(config) # Setup Arguments
-    config.backbone = 'resnet20'
     config.feature_dim = 64
     config.use_motion = False
 
@@ -135,8 +134,6 @@ def main(isTest):
     config.use_motion = True
     config.dataset = 'ucf101'
     config = set_up_datasets(config)  # Setup Arguments
-    config.backbone = 'resnet18'
-    config.feature_dim = 512
 
     model_motion, nVar_motion, acc_motion = run_mics(config)
 
