@@ -113,7 +113,6 @@ def main():
     # Ensure proper configuration for plain MICS
     config.dataset = 'cifar100'
     config = set_up_datasets(config) # Setup Arguments
-    config.feature_dim = 64
     config.use_motion = False
 
     model_plain, nVar_plain, acc_plain = run_mics(config)

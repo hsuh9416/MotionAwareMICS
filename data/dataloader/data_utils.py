@@ -35,7 +35,7 @@ def set_up_datasets(args):
         args.num_classes = 100
         args.way = 5
         args.shot = 5
-        args.sessions = 9
+        args.sessions = 8 # 9
         args.Dataset = CifarDataset
     elif args.dataset == 'ucf101':
         args.base_class = 60  # Base classes for UCF101

@@ -1,5 +1,5 @@
 import torch.nn as nn
-from mixup_utils import *
+from model.mix_up import *
 
 class BasicBlock(nn.Module):
     def __init__(self, in_planes, planes, stride=1, downsample=None, is_last=False):
