@@ -1,5 +1,6 @@
 import os
 import math
+import datetime
 from copy import deepcopy
 from model.mics import MICS
 from data.dataloader.data_utils import *
@@ -91,24 +92,14 @@ class MICSTrainer:
         return model
 
     def set_save_path(self):
-        mode = self.args.base_mode
-        self.args.save_path = '%s/' % self.args.dataset
-        self.args.save_path = self.args.save_path + '%s/%s/' % (self.args.project, self.args.phase)
-        self.args.save_path = self.args.save_path + '%s/' % mode
-        if 'cos' in mode:
-            self.args.save_path = self.args.save_path + '-T_%.2f' % (self.args.temperature)
-        if 'ft' in self.args.new_mode:
-            self.args.save_path = self.args.save_path + '-ftLR_%.3f-ftEpoch_%d' % (
-                self.args.lr_new, self.args.epochs_new)
-        self.args.save_path = self.args.save_path + '-' + self.args.memo
-
-        self.args.save_path = os.path.join('results', self.args.save_path)
-        ensure_path(self.args.save_path)
-        return None
+        # Set the save path of the model
+        time_str = datetime.datetime.now().strftime('%m%d%Y')
+        self.args.save_path = '%s/%s' % (self.args.dataset, time_str) # e.g.ucf101/04202025
+        self.args.save_path = os.path.join('results', self.args.save_path)  # e.g.results/ucf101/04202025
+        os.makedirs(self.args.save_path, exist_ok=True)
 
     def set_up_model(self):
-        self.model = MICS(self.args)
-        self.model = self.model.cuda()
+        self.model = MICS(self.args).to(self.args.device)
 
         if self.args.model_dir != None:
             print(f'Loading init parameters from: {self.args.model_dir}')
