@@ -75,7 +75,10 @@ class MICS(nn.Module):
             features = torch.flatten(features, 1)
 
         # Feature extraction and Mix-up processing via encoder
-        x, new_labels, mix_label_mask = self.encoder(x, labels, args.mixup_alpha, cur_num_class, args.gamma)
+        x, new_labels, mix_label_mask = self.encoder(x, labels,
+                                                     mixup_alpha=args.mixup_alpha,
+                                                     num_base_classes=cur_num_class,
+                                                     gamma=args.gamma)
 
         # Embedding
         x = F.adaptive_avg_pool2d(x, 1)
@@ -93,6 +96,8 @@ class MICS(nn.Module):
         x = args.temperature * x
 
         return x, new_labels # images, re-targeted labels
+
+#TODO should fix below functions!
 
 # Motion-aware mixup implementation
 class MotionAwareMixup(nn.Module):
@@ -144,7 +149,7 @@ class MotionAwareMixup(nn.Module):
             adjusted_lam = max(0.0, min(1.0, adjusted_lam))
         except Exception as e:
             print(f"Error in motion processing: {e}")
-            adjusted_lam = lam  # Fallback to original lambda
+            adjusted_lam = lam  # Fallback to the original lambda
 
         # Mix frames with adjusted lambda
         mixed_frames = adjusted_lam * frames1 + (1 - adjusted_lam) * frames2

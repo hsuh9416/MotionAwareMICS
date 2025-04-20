@@ -87,13 +87,11 @@ class ResNet(nn.Module):
             # Maniford Mix-up: Mix-up technique used in the paper
             Reference: Manifold Mixup [Souvik Mandal, Medium]
             https://medium.com/@mandalsouvik/manifold-mixup-learning-better-representations-by-interpolating-hidden-states-8a2c949d5b5b
-            - lambda = beta distribution with mixup_alpha
         """
         # Pick the layer to conduct mix-up
         layer_mix = 2 # 0: Input, 1: First layer, 2: Second layer
 
-        # Compute lambda
-
+        # Compute lambda = beta distribution with mixup_alpha
         lamb = np.random.beta(mixup_alpha, mixup_alpha) if mixup_alpha > 0 else 1
         lamb = torch.from_numpy(np.array([lamb]).astype('float32')).cuda()
 
@@ -102,11 +100,7 @@ class ResNet(nn.Module):
 
         # Layer mix after Input
         if layer_mix == 0:
-            out, new_labels, mix_label_mask = middle_mixup_process(out,
-                                                                   new_labels,
-                                                                   num_base_classes,
-                                                                   lamb,
-                                                                   gamma=gamma)
+            out, new_labels, mix_label_mask = middle_mixup_process(out, new_labels, num_base_classes, lamb, gamma=gamma)
 
         # First layer
         out = self.conv1(out)
@@ -116,18 +110,14 @@ class ResNet(nn.Module):
 
         # Layer mix after First layer
         if layer_mix == 1:
-            out, new_labels, mix_label_mask = middle_mixup_process(out, new_labels, num_base_classes, lamb,
-                                                                   piecewise_linear_h1=piecewise_linear_h1,
-                                                                   piecewise_linear_h2=piecewise_linear_h2)
+            out, new_labels, mix_label_mask = middle_mixup_process(out, new_labels, num_base_classes, lamb, gamma=gamma)
 
         # Second layer
         out = self.layer2(out)
 
         # Layer mix after Second layer
-        if layer_mix == 1:
-            out, new_labels, mix_label_mask = middle_mixup_process(out, new_labels, num_base_classes, lamb,
-                                                                   piecewise_linear_h1=piecewise_linear_h1,
-                                                                   piecewise_linear_h2=piecewise_linear_h2)
+        if layer_mix == 2:
+            out, new_labels, mix_label_mask = middle_mixup_process(out, new_labels, num_base_classes, lamb, gamma=gamma)
 
         # Third layer
         out = self.layer3(out)
