@@ -12,6 +12,7 @@ from data.dataloader.data_utils import set_up_datasets, get_dataloader
 from model.mics import MICS  # Using our fixed implementation
 from evaluate import evaluate, compute_nVar, visualize_pca, visualize_nVar, visualize_acc
 from train import train_base, train_inc  # Using our fixed training functions
+from train.trainer import MICSTrainer
 
 
 # Seed setting for reproducibility
@@ -28,6 +29,9 @@ def set_seed(seed=42):
 def run_mics(config):
     # Initialize model with base classes
     model = MICS(config).to(config.device)
+
+    # Initialize trainer
+    trainer = MICSTrainer(model, config)
 
     # Base session Evaluation
     current_classes = config.base_classes
@@ -115,6 +119,7 @@ def main():
     config = set_up_datasets(config) # Setup Arguments
     config.use_motion = False
 
+    # Run MICS algorithm and save checkpoints
     model_plain, nVar_plain, acc_plain = run_mics(config)
 
     # Save checkpoints
@@ -134,6 +139,7 @@ def main():
     config.dataset = 'ucf101'
     config = set_up_datasets(config)  # Setup Arguments
 
+    # Run Extended MICS algorithm and save checkpoints
     model_motion, nVar_motion, acc_motion = run_mics(config)
 
     # Save checkpoints

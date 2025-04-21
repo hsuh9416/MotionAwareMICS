@@ -14,8 +14,10 @@ class Config:
         self.dataroot = '/content/drive/MyDrive/MotionAwareMICS/data/' # Colab
 
         # Training - Same as the paper
-        self.base_mode = 'ft_cos'
-        self.new_mode = 'avg_cos'
+        self.base_mode = 'ft_cos' # Cosine classifier
+        self.new_mode = 'avg_cos' # Average data embedding / Cosine classifier
+        self.schedule = 'Step' # Schedule function
+        self.step_size = 40 # Check schedule every 40 epochs
         self.batch_size = 128 # High-capacity fits with A100 GPU
         self.base_epochs = 100 # Base session epoch number
         self.inc_epochs = 10 # Incremental session epoch number
@@ -24,6 +26,7 @@ class Config:
         self.momentum = 0.9 # SGD momentum value
         self.weight_decay = 5e-4 # Weight decay (normalization)
         self.temperature = 0.1 # Cosine similarity temperature scaling (mentioned in the paper)
+        self.st_ratio = 0.01 # session trainable parameter ratio
 
         # MICS settings - based on Table 4 (Section 4.5) of the paper
         # CIFAR-100(Best practice)

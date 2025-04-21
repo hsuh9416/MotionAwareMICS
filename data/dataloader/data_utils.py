@@ -39,7 +39,7 @@ def set_up_datasets(args):
         args.Dataset = CifarDataset
         args.inc_learning_rate = 0.0005 # In the paper
     elif args.dataset == 'ucf101':
-        args.base_class = 60  # Base classes for UCF101
+        args.base_class = 61  # Base classes for UCF101
         args.num_classes = 101
         args.way = 5  # Number of new classes per session
         args.shot = 5  # Number of shots per class

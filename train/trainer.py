@@ -2,10 +2,8 @@ import os
 import math
 import datetime
 from copy import deepcopy
-from model.mics import MICS
 from data.dataloader.data_utils import *
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from tqdm import tqdm
@@ -28,14 +26,8 @@ def count_mix_acc(logits, label, topk=(1,)):
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
 
-def ensure_path(path):
-    if os.path.exists(path):
-        pass
-    else:
-        print('create folder:', path)
-        os.makedirs(path)
-
-class Averager():
+# Dynamically average the values
+class Averager:
     def __init__(self):
         self.n = 0
         self.v = 0
@@ -44,86 +36,21 @@ class Averager():
         self.v = (self.v * self.n + x) / (self.n + 1)
         self.n += 1
 
-    def item(self):
+    def val(self):
         return self.v
 
 class MICSTrainer:
-    def __init__(self, args):
+    def __init__(self, model, args):
         super().__init__(args)
         self.args = args
-        self.args = set_up_datasets(self.args)
-        self.model = MICS(self.args).to(self.args.device)
-        self.results = self.set_acc_table(self.args)
+        self.model = model
+        self.results = self.set_acc_table(self.args) # Init the accuracy table
+        self.save_path = self.set_save_path() # Save the model
 
-    def replace_base_fc(self, trainset, transform, model, args):
-        # replace fc.weight with the embedding average of train data
-        model = model.eval()
-        mode = model.mode
-
-        trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=128,
-                                                  num_workers=8, pin_memory=True, shuffle=False)
-        trainloader.dataset.transform = transform
-        embedding_list = []
-        label_list = []
-        # data_list=[]
-        with torch.no_grad():
-            for i, batch in enumerate(trainloader):
-                data, label = [_.cuda() for _ in batch]
-                model.mode = 'encoder'
-                embedding = model(data)
-
-                embedding_list.append(embedding.cpu())
-                label_list.append(label.cpu())
-        embedding_list = torch.cat(embedding_list, dim=0)
-        label_list = torch.cat(label_list, dim=0)
-
-        proto_list = []
-
-        for class_index in range(args.base_class):
-            data_index = (label_list == class_index).nonzero()
-            embedding_this = embedding_list[data_index.squeeze(-1)]
-            embedding_mean = embedding_this.mean(0)
-            proto_list.append(embedding_mean)
-
-        proto_list = torch.stack(proto_list, dim=0)
-
-        model.fc.weight.data[:args.base_class] = proto_list
-        model.mode = mode
-        return model
-
-    def set_save_path(self):
-        # Set the save path of the model
-        time_str = datetime.datetime.now().strftime('%m%d%Y')
-        self.args.save_path = '%s/%s' % (self.args.dataset, time_str) # e.g.ucf101/04202025
-        self.args.save_path = os.path.join('results', self.args.save_path)  # e.g.results/ucf101/04202025
-        os.makedirs(self.args.save_path, exist_ok=True)
-
-    def set_up_model(self):
-        self.model = MICS(self.args).to(self.args.device)
-
-        if self.args.model_dir != None:
-            print(f'Loading init parameters from: {self.args.model_dir}')
-            self.best_model_dict = dict()
-
-            try:
-                temp_model_dict = torch.load(self.args.model_dir)['params']
-                for key, value in temp_model_dict.items():
-                    if 'dummy' not in key:
-                        self.best_model_dict[key] = value
-            except:
-                temp_model_dict = torch.load(self.args.model_dir)['state_dict']
-                for key, value in temp_model_dict.items():
-                    if 'backbone' in key:
-                        temp_key = 'module.encoder' + key.split('backbone')[1]
-                        if 'shortcut' in temp_key:
-                            temp_key = temp_key.replace('shortcut', 'downsample')
-                        self.best_model_dict[temp_key] = value
-            self.best_model_dict['module.fc.weight'] = self.model.module.fc.weight
-
-        else:
-            raise ValueError('You must initialize a pre-trained model')
+        self.best_model_dict = self.model.state_dict() # Init the best model dict by initial state dict
 
     def set_acc_table(self, args):
+        """ Set the accuracy table of the model """
         results = dict()
         results["acc"] = np.zeros([args.sessions])
         results["acc_base"] = np.zeros([args.sessions])
@@ -136,6 +63,70 @@ class MICSTrainer:
         results["acc_new2"] = np.zeros([args.sessions])
 
         return results
+
+    def set_save_path(self):
+        """ Set the save path of the model """
+        time_str = datetime.datetime.now().strftime('%m%d%Y')
+        save_path = '%s/%s' % (self.args.dataset, time_str) # e.g.ucf101/04202025
+        save_path = os.path.join('results', save_path)  # e.g.results/ucf101/04202025
+        os.makedirs(save_path, exist_ok=True)
+
+        return save_path
+
+    def average_embedding(self, trainset, transform):
+        """ replace fc.weight with the embedding average of train data """
+        model = self.model.eval() # Evaluation mode
+        current_mode = model.mode
+
+        # Data
+        trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=128,
+                                                  num_workers=8, pin_memory=True, shuffle=False)
+
+        # Replace the transform in the linked data loader with the transform used in the test set.
+        trainloader.dataset.transform = transform
+
+        embedding_list = []
+        label_list = []
+
+        # Embedding
+        with torch.no_grad(): # pure forwarding without gradient
+            for i, batch in enumerate(trainloader):
+                data, label = [_.cuda() for _ in batch]
+                model.mode = 'encoder' # Encoder mode
+                embedding = model(data) # Feature extraction
+
+                embedding_list.append(embedding.cpu())
+                label_list.append(label.cpu())
+
+        # Convert(merge) to a single torch.tensor respectively
+        embedding_list = torch.cat(embedding_list, dim=0)
+        label_list = torch.cat(label_list, dim=0)
+
+        """
+            A prototype is a vector representing a particular class, usually the average of the feature vectors of 
+            all data points belonging to that class.
+            
+            p_c = (1/N) * sum(embedding_c)
+            
+            - p_c: prototype of class c
+            - embedding_c: feature vector of class c
+            - N: number of data points in class c
+        """
+        # Calculate prototypes by class
+        proto_list = []
+        for class_index in range(self.args.base_class):
+            data_index = (label_list == class_index).nonzero() # nonzero: returns the indices of all non-zero elements of input tensor.
+            embedding_this = embedding_list[data_index.squeeze(-1)] # [N, 1] -> [N] then embedding for each data point by index
+            embedding_mean = embedding_this.mean(0) # Averaging
+            proto_list.append(embedding_mean)
+
+        # Update classifier weights by prototypes
+        model.fc.weight.data[:self.args.base_class] = torch.stack(proto_list, dim=0) # Convert(stack) to a single torch.tensor
+
+        # Recover the mode of the model
+        model.mode = current_mode
+
+        return model
 
     def get_logits(self, x, fc):
         """A function that calculates the raw score (logit) to be used as a classification result."""
@@ -203,66 +194,107 @@ class MICSTrainer:
         else:
             return model, None
 
+    def update_novel_proto(self, dataloader, class_list):
+        model = self.model.eval()
+
+        for batch in dataloader:
+            data, label = [_.cuda() for _ in batch]
+            data = model.encode(data).detach()
+
+        # Update prototype weights
+        new_fc = []
+        for class_index in class_list:
+            data_index = (label == class_index).nonzero()  # nonzero: returns the indices of all non-zero elements of input tensor.
+            embedding = data[data_index.squeeze(-1)] # [N, 1] -> [N] then embedding for each data point by index
+            proto = embedding.mean(0) # Averaging
+            new_fc.append(proto)
+            model.fc.weight.data[class_index] = proto
+
+        return model
+
+    def base_train(self):
+        # Base session training
+        base_optimizer = torch.optim.SGD([
+            {'param': self.model.encoder.parameters(), 'lr': self.args.learning_rate}, # Encoder
+            {'params': self.model.fc.parameters(), 'lr': self.args.learning_rate}], # Fully connected layer
+            momentum=0.9, # Accelerate the slope and suppress the sedation
+            nesterov=True, # Move in the corrected direction, move in the momentum direction
+            weight_decay=self.args.decay) # L2 regularization
+
+        # Adjusting learning rate: STEP method
+        base_scheduler = torch.optim.lr_scheduler.StepLR(base_optimizer, step_size=self.args.step_size, gamma=self.args.gamma)
+
+        # Get dataset
+        train_set, trainloader, testloader = get_dataloader(self.args, 0)
+        self.model = self.average_embedding(train_set, testloader.dataset.transform)
+
+        # Training base session
+        max_acc = 0
+        best_model_dict = None
+
+        for epoch in range(self.args.epochs_base):
+            # For each epoch
+            for i, batch in enumerate(trainloader):
+                data, label = [_.cuda() for _ in batch]
+                logits = self.model(data)
+                loss = F.cross_entropy(logits, label)
+
+                base_optimizer.zero_grad()
+                loss.backward()
+                base_optimizer.step()
+
+            base_scheduler.step()
+
+        # Evaluation & Save
+        tsl, tsa = self.test(self.model, testloader, args, 0)
+        self.trlog['max_acc'][0] = float('%.3f' % (tsa * 100))
+        save_model_dir = os.path.join(self.save_path, 'session' + str(0 + 1) + '_max_acc.pth')
+        torch.save(dict(params=self.model.state_dict()), save_model_dir)
+
+        print('Test acc = {:.2f}%'.format(self.trlog['max_acc'][0]))
+
     def train(self):
-        args = self.args
         self.model.load_state_dict(self.best_model_dict)
-        print([{name: param.requires_grad} for name, param in self.model.named_parameters()])
-        self.model.mode = self.args.new_mode
+        self.model.mode = self.args.new_mode # avg_cos
 
         optimizer, scheduler = self.get_optimizer_new()
 
-        for session in range(0, args.sessions):
+
+        for session in range(1, self.args.sessions):
 
             print("\nSession: [%d]" % (session + 1))
-            train_set, trainloader, testloader = get_dataloader(args, session)
+            train_set, trainloader, testloader = get_dataloader(self.args, session)
 
-            if session != 0:
-                train_transform = deepcopy(trainloader.dataset.transform)
-                trainloader.dataset.transform = testloader.dataset.transform
-                self.model = self.update_novel_proto(self.model, trainloader, np.unique(train_set.targets))
+            train_transform = deepcopy(trainloader.dataset.transform)
+            trainloader.dataset.transform = testloader.dataset.transform
+            self.model = self.update_novel_proto(trainloader, np.unique(train_set.targets))
 
-                # Incremental MICS
-                trainloader.dataset.transform = train_transform
-                for epoch in range(args.epochs_new):
-                    self.model, P_st_idx = self.update_param(self.model, self.best_model_dict)
-                    tl, ta = self.new_train(self.model, trainloader, optimizer, scheduler, epoch, args, P_st_idx, session)
+            # Incremental MICS
+            trainloader.dataset.transform = train_transform
+            for epoch in range(self.args.epochs_new):
+                self.model, P_st_idx = self.update_param(self.model, self.best_model_dict)
+                tl, ta = self.new_train(self.model, trainloader, optimizer, scheduler, epoch, self.args, P_st_idx, session)
 
-                trainloader.dataset.transform = testloader.dataset.transform
-                self.model = self.update_novel_proto(self.model, trainloader, np.unique(train_set.targets))
-            else:
-                self.model = self.replace_base_fc(train_set, testloader.dataset.transform, self.model, args)
+            trainloader.dataset.transform = testloader.dataset.transform
+            self.model = self.update_novel_proto(trainloader, np.unique(train_set.targets))
 
             # Evaluation & Save
-            tsl, tsa = self.test(self.model, testloader, args, session)
+            tsl, tsa = self.test(self.model, testloader, self.args, session)
             self.trlog['max_acc'][session] = float('%.3f' % (tsa * 100))
-            save_model_dir = os.path.join(args.save_path, 'session' + str(session + 1) + '_max_acc.pth')
+            save_model_dir = os.path.join(self.save_path, 'session' + str(session + 1) + '_max_acc.pth')
             torch.save(dict(params=self.model.state_dict()), save_model_dir)
 
             print('Test acc = {:.2f}%'.format(self.trlog['max_acc'][session]))
 
-        args.save_path = os.path.join(args.save_path, 'last_session.pth')
-        print(f"Save last session model to {args.save_path}")
-        torch.save(dict(params=self.model.state_dict()), args.save_path)
+        self.save_path = os.path.join(self.save_path, 'last_session.pth')
+        print(f"Save last session model to {self.save_path}")
+        torch.save(dict(params=self.model.state_dict()), self.save_path)
 
         print('\n*************** Final results ***************')
         print(self.trlog['max_acc'], '\n')
         self.print_table(self.results, self.args)
 
-    def update_novel_proto(self, model, dataloader, class_list):
-        model = model.eval()
-        for batch in dataloader:
-            data, label = [_.cuda() for _ in batch]
-            data = model.encode(data).detach()
 
-        new_fc = []
-        for class_index in class_list:
-            data_index = (label == class_index).nonzero().squeeze(-1)
-            embedding = data[data_index]
-            proto = embedding.mean(0)
-            new_fc.append(proto)
-            model.fc.weight.data[class_index] = proto
-
-        return model
 
     def test(self, model, testloader, args, session):
         test_class = args.base_class + session * args.way
@@ -394,9 +426,7 @@ class MICSTrainer:
         ta = Averager()
         bce_loss = torch.nn.BCELoss().cuda()
         softmax = torch.nn.Softmax(dim=1).cuda()
-        is_mix = "mix" in args.train
         train_class = args.base_class + session * args.way
-        base_w = model.fc.weight[:train_class - args.way]
 
         model = model.train()
         tqdm_gen = tqdm(trainloader)
@@ -407,28 +437,12 @@ class MICSTrainer:
 
             output, retarget = model.forward_mix(args, Variable(data), Variable(label))
 
-            if args.use_midpoint:
-                if retarget.shape[1] > softmax(output).shape[1]:
-                    retarget = retarget[:, :softmax(output).shape[1]]
-                elif retarget.shape[1] < softmax(output).shape[1]:
-                    output = output[:, :retarget.shape[1]]
-                loss += bce_loss(softmax(output), retarget)
-                acc += count_mix_acc(output, label)[0] * 0.01
-            else:
-                if args.use_mixup or args.use_softlabel:
-                    classifier = model.fc
-                    output = model.get_logits(output, classifier.weight)
-                    if retarget.shape[1] > softmax(output).shape[1]:
-                        retarget = retarget[:, :softmax(output).shape[1]]
-                    elif retarget.shape[1] < softmax(output).shape[1]:
-                        output = output[:, :retarget.shape[1]]
-
-                    loss += bce_loss(softmax(output), retarget)
-                    acc += count_mix_acc(output, label)[0] * 0.01
-                else:
-                    classifier = model.fc
-                    output = model.get_logits(output, classifier.weight)
-                    loss += F.cross_entropy(output, label)
+            if retarget.shape[1] > softmax(output).shape[1]:
+                retarget = retarget[:, :softmax(output).shape[1]]
+            elif retarget.shape[1] < softmax(output).shape[1]:
+                output = output[:, :retarget.shape[1]]
+            loss += bce_loss(softmax(output), retarget)
+            acc += count_mix_acc(output, label)[0] * 0.01
 
             lrc = scheduler.get_last_lr()[0]
             tqdm_gen.set_description('Session 0, epo {}, lrc={:.4f},total loss={:.4f} acc={:.4f}'
@@ -440,13 +454,13 @@ class MICSTrainer:
             loss.backward()
             optimizer.step()
 
-            if self.args.st_ratio < 1:
-                updated_param_dict = deepcopy(model.state_dict())  # parameters after update
-                model.load_state_dict(self.best_model_dict)
-                for k, v in dict(model.named_parameters()).items():
-                    if v.requires_grad:
-                        for idx in P_st_idx[k]:
-                            v.data[idx] = updated_param_dict[k].data[idx]
+
+            updated_param_dict = deepcopy(model.state_dict())  # parameters after update
+            model.load_state_dict(self.best_model_dict)
+            for k, v in dict(model.named_parameters()).items():
+                if v.requires_grad:
+                    for idx in P_st_idx[k]:
+                        v.data[idx] = updated_param_dict[k].data[idx]
 
         tl = tl.item()
         ta = ta.item()
