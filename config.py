@@ -20,7 +20,7 @@ class Config:
         self.step_size = 40 # Check schedule every 40 epochs
         self.batch_size = 128 # High-capacity fits with A100 GPU
         self.base_epochs = 100 # Base session epoch number
-        self.inc_epochs = 10 # Incremental session epoch number
+        self.inc_epochs = 100 # Incremental session epoch number
         self.learning_rate = 0.1 # Initial learning rate
         self.inc_learning_rate = 0.1  # Initial learning rate
         self.momentum = 0.9 # SGD momentum value

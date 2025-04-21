@@ -54,7 +54,16 @@ class MICS(nn.Module):
         mid = (first + second) / 2 # e.g. ([1, 0, 0] + [0, 1, 0]) / 2 -> [0.5, 0.5, 0]
         return mid
 
-    def forward(self, args, x, labels=None):
+    def forward(self, x):
+        x = self.encode(x)
+        if self.mode != 'encoder': # classification
+            # Cosine similarity
+            x = F.linear(F.normalize(x, p=2, dim=-1), F.normalize(self.fc.weight, p=2, dim=-1))
+            # Scale temperature
+            x = self.args.temperature * x
+        return x
+
+    def forward_mix_up(self, args, x, labels=None):
         """Forward propagation with Mix-Up"""
         cur_num_class = int(max(labels)) + 1 # Biggest class index + 1
 
