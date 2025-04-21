@@ -170,10 +170,10 @@ class ResNet20(nn.Module):
         expansion = block.expansion if block.expansion else 1
         downsample = None
         # If stride is greater than 1 or the channel is larger than the input, a downsampling layer is required.
-        if stride != 1 or self.in_planes != planes * block.expansion:
+        if stride != 1 or self.in_planes != planes * expansion:
             downsample = nn.Sequential(
-                nn.Conv2d(self.in_planes, planes * block.expansion, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(planes * block.expansion))
+                nn.Conv2d(self.in_planes, planes * expansion, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(planes * expansion))
 
         layers = [] # Layer blocks.
 
@@ -181,7 +181,7 @@ class ResNet20(nn.Module):
         first_layer = block(self.in_planes, planes, stride, downsample)
         layers.append(first_layer)
 
-        self.in_planes = planes * block.expansion # Increase the number of input channels
+        self.in_planes = planes * expansion # Increase the number of input channels
 
         # Add the remaining blocks of the layer.
         for i in range(1, blocks-1):
