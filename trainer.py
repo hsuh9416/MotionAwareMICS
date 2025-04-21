@@ -45,7 +45,7 @@ class Averager:
 
 class MICSTrainer:
     def __init__(self, model, args):
-        super().__init__(args)
+        super().__init__(model, args)
         self.args = args
         self.model = model
         self.results = self.set_acc_table() # Init the accuracy table
