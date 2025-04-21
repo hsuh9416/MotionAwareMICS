@@ -23,7 +23,7 @@ def set_seed(seed=42):
 # Function to execute the entire MICS algorithm
 def run_process(config):
     # Initialize model with base classes
-    model = MICS(config).to(config.device)
+    model = MICS(config).cuda()
 
     # Initialize trainer
     trainer = MICSTrainer(model, config)

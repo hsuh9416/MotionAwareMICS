@@ -72,7 +72,7 @@ def visualize_pca(model, test_loaders, current_classes, config, session_idx):
     with torch.no_grad():
         for loader_idx, test_loader in enumerate(test_loaders[:session_idx+1]):
             for inputs, targets in test_loader:
-                inputs, targets = inputs.to(config.device), targets.to(config.device)
+                inputs, targets = inputs.cuda(), targets.cuda()
                 features = model(inputs, return_features=True)
 
                 all_features.append(features.cpu().numpy())

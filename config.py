@@ -6,7 +6,7 @@ import multiprocessing
 class Config:
     def __init__(self):
         # Default
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda")
 
         # Increase dataloader workers based on virtual CPU count
         self.num_workers = min(multiprocessing.cpu_count() * 2, 12)

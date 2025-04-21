@@ -197,8 +197,8 @@ def compute_optical_flow(frames):
                                                     winsize=15, iterations=3, poly_n=5, poly_sigma=1.2, flags=0)
 
                 # Store flow
-                flows[b, 0, t] = torch.from_numpy(flow[:, :, 0]).to(frames.device)
-                flows[b, 1, t] = torch.from_numpy(flow[:, :, 1]).to(frames.device)
+                flows[b, 0, t] = torch.from_numpy(flow[:, :, 0]).cuda()
+                flows[b, 1, t] = torch.from_numpy(flow[:, :, 1]).cuda()
 
             except Exception as e:
                 print(f"Error computing optical flow: {e}")
