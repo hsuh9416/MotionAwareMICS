@@ -11,6 +11,7 @@ import torch.nn as nn
 from mix_up import *
 
 class BasicBlock(nn.Module):
+    expansion = 1
     def __init__(self, in_planes, planes, stride=1, downsample=None, groups=1,
                  base_width=64, dilation=1, is_last=False):
         super(BasicBlock, self).__init__()
@@ -25,7 +26,6 @@ class BasicBlock(nn.Module):
         self.groups = groups
         self.base_width = base_width
         self.dilation = dilation
-        self.expansion = 1
 
     def forward(self, x):
         residual = x

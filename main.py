@@ -7,7 +7,7 @@ import torch
 
 # Import user-defined modules
 from config import Config
-from data.dataloader.data_utils import set_up_datasets, get_dataloader
+from data.dataloader.data_utils import set_up_datasets
 from mics import MICS  # MICS model with motion-aware features
 from trainer import MICSTrainer
 
