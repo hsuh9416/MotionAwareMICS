@@ -56,6 +56,10 @@ class MICSTrainer:
     def set_acc_table(self, args):
         """ Set the accuracy table of the model """
         results = dict()
+        results["train_acc"] = [list()] * args.sessions
+        results["train_loss"] = [list()] * args.sessions
+        results["train_nVAR"] = np.zeros([args.sessions])
+        results["test_nVAR"] = np.zeros([args.sessions])
         results["acc"] = np.zeros([args.sessions])
         results["acc_base"] = np.zeros([args.sessions])
         results["acc_novel"] = np.zeros([args.sessions])
@@ -65,7 +69,7 @@ class MICSTrainer:
         results["acc_novel2"] = np.zeros([args.sessions])
         results["acc_old2"] = np.zeros([args.sessions])
         results["acc_new2"] = np.zeros([args.sessions])
-        results["nVAR"] = np.zeros([args.sessions])
+
         return results
 
     def set_save_path(self):
@@ -345,8 +349,8 @@ class MICSTrainer:
             train_acc, train_loss = self.base_train(trainloader, base_optimizer, base_scheduler, epoch)
             base_scheduler.step()
 
-
-
+            self.results["train_acc"][0] = train_acc
+            self.results["train_loss"][0] = train_loss
 
             # Save the best model
             if train_acc > best_acc or (train_acc == best_acc and train_loss < best_loss):
@@ -358,7 +362,7 @@ class MICSTrainer:
 
         # Compute nVar
         avg_nvar = compute_nVar(self.model, trainloader, self.args.base_class)
-        self.nvar_values[0](avg_nvar)
+        self.results['train_nVAR'][0](avg_nvar)
 
         print(f'[Train - Base session] Accuracy = {round(best_loss, 2)}, Loss = {round(best_loss, 2)}, nVAR = {round(avg_nvar, 2)}')
 
@@ -367,6 +371,7 @@ class MICSTrainer:
 
         # Evaluation by test
         test_acc, test_loss, test_nvar = self.test(self.model, testloader, self.args, 0)
+        self.results['test_nVAR'][0](test_nvar)
         print(f'[Test - Base session] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}, nVAR = {round(test_nvar, 2)}')
 
         ### 2. Incremental session training ###
@@ -389,10 +394,10 @@ class MICSTrainer:
                 self.model, P_st_idx = self.update_param(self.model, self.best_model_dict)
                 train_acc, train_loss = self.inc_train(self.model, trainloader, optimizer, scheduler, epoch, self.args, P_st_idx, session)
 
-                # Compute nVar
-                cur_num_classes = self.args.base_class + session * self.args.way
-                avg_nvar = compute_nVar(self.model, trainloader, cur_num_classes)
-                self.nvar_values[session](avg_nvar)
+                self.results["train_acc"][session] = train_acc
+                self.results["train_loss"][session] = train_loss
+
+
 
                 # Save the best model
                 if train_acc > best_acc or (train_acc == best_acc and train_loss < best_loss):
@@ -402,12 +407,18 @@ class MICSTrainer:
                     torch.save(dict(params=self.model.state_dict()), save_model_dir)
                     self.best_model_dict = deepcopy(self.model.state_dict())
 
+            # Compute nVar
+            cur_num_classes = self.args.base_class + session * self.args.way
+            avg_nvar = compute_nVar(self.model, trainloader, cur_num_classes)
+            self.results['train_nVAR'][session](avg_nvar)
+
             # Replace the transform in the linked data loader with the transform used in the test set.
             trainloader.dataset.transform = testloader.dataset.transform
             self.model = self.average_embedding_inc(trainloader, np.unique(train_set.targets)) # Embedding
 
             # Evaluation by test
             test_acc, test_loss, test_nvar = self.test(self.model, testloader, self.args, session)
+            self.results['test_nVAR'][session](test_nvar)
             print(f'[Test - Increment session {session}] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}, nVAR = {round(test_nvar, 2)}')
 
         # Save the final model
@@ -415,7 +426,7 @@ class MICSTrainer:
         torch.save(dict(params=self.model.state_dict()), save_model_dir)
 
         print('\n*************** Final results ***************')
-        print(self.trlog['max_acc'], '\n')
+        print(self.results['max_acc'], '\n')
         self.print_table(self.results, self.args)
 
     def test(self, model, testloader, args, session):

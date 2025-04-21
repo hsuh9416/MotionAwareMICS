@@ -35,7 +35,7 @@ def set_up_datasets(args):
         args.num_classes = 100
         args.way = 5
         args.shot = 5
-        args.sessions = 8 # 9
+        args.sessions = 9 # base + 8 incremental sessions
         args.Dataset = CifarDataset
         args.inc_learning_rate = 0.0005 # In the paper
     elif args.dataset == 'ucf101':
@@ -43,7 +43,7 @@ def set_up_datasets(args):
         args.num_classes = 101
         args.way = 5  # Number of new classes per session
         args.shot = 5  # Number of shots per class
-        args.sessions = 8  # Total incremental sessions
+        args.sessions = 9  # base + 8 incremental sessions
         args.Dataset = UCF101Dataset
         args.frames_per_clip = 16  # Number of frames per video clip
         args.step_between_clips = 8  # Step size between clips
