@@ -113,7 +113,7 @@ def get_new_dataloader(args, session):
         trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=batch_size_new, shuffle=False,
                                                   num_workers=args.num_workers, pin_memory=True)
     else:
-        batch_size = args.batch_size_new if hasattr(args, 'batch_size_new') else args.batch_size_base
+        batch_size = args.batch_size_new if hasattr(args, 'batch_size_new') else args.batch_size
         trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=batch_size, shuffle=True,
                                                   num_workers=args.num_workers, pin_memory=True)
 
