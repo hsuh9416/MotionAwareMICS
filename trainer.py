@@ -56,8 +56,8 @@ class MICSTrainer:
     def set_acc_table(self):
         """ Set the accuracy table of the model """
         results = dict()
-        results["train_acc"] = [list()] * self.args.sessions
-        results["train_loss"] = [list()] * self.args.sessions
+        results["train_acc"] = [[] for _ in range(self.args.sessions)]
+        results["train_loss"] = [[] for _ in range(self.args.sessions)]
         results["train_nVAR"] = np.zeros([self.args.sessions])
         results["test_nVAR"] = np.zeros([self.args.sessions])
         results["acc"] = np.zeros([self.args.sessions])
@@ -148,7 +148,7 @@ class MICSTrainer:
         # Update prototype weights
         new_fc = []
         for class_index in class_list:
-            data_index = float(label == class_index).nonzero() # nonzero: returns all non-zero elements' indices of the input tensor.
+            data_index = (label == class_index).nonzero() # nonzero: returns all non-zero elements' indices of the input tensor.
             embedding = data[data_index.squeeze(-1)] # [N, 1] -> [N] then embedding for each data point by index
             proto = embedding.mean(0) # Averaging
             new_fc.append(proto)
@@ -410,7 +410,7 @@ class MICSTrainer:
             # Compute nVar
             cur_num_classes = self.args.base_class + session * self.args.way
             avg_nvar = compute_nVar(self.model, train_loader, cur_num_classes)
-            self.results['train_nVAR'][session](avg_nvar)
+            self.results['train_nVAR'][session] = avg_nvar
 
             # Replace the transform in the linked data loader with the transform used in the test set.
             train_loader.dataset.transform = train_loader.dataset.transform
