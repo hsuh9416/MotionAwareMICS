@@ -80,15 +80,16 @@ class ResNet18(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
     def make_layer(self, block, planes, blocks, stride=1, dilate=False):
+        expansion = block.expansion if block.expansion else 1
         downsample = None
         previous_dilation = self.dilation
         if dilate:
             self.dilation *= stride
             stride = 1
-        if stride != 1 or self.in_planes != planes * block.expansion:
+        if stride != 1 or self.in_planes != planes * expansion:
             downsample = nn.Sequential(
-                nn.Conv2d(self.in_planes, planes * block.expansion, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(planes * block.expansion))
+                nn.Conv2d(self.in_planes, planes * expansion, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(planes * expansion))
 
         layers = []
         layers.append(block(self.in_planes, planes, stride, downsample, self.groups,
@@ -166,8 +167,9 @@ class ResNet20(nn.Module):
         self.layer3 = self.make_layer(block, 64, layers[2], stride=2, is_last=True)
 
     def make_layer(self, block, planes, blocks, stride=1, is_last=False):
+        expansion = block.expansion if block.expansion else 1
         downsample = None
-        # If stride is greater than 1 or the channel is larger than the input, downsampling layer is required.
+        # If stride is greater than 1 or the channel is larger than the input, a downsampling layer is required.
         if stride != 1 or self.in_planes != planes * block.expansion:
             downsample = nn.Sequential(
                 nn.Conv2d(self.in_planes, planes * block.expansion, kernel_size=1, stride=stride, bias=False),
