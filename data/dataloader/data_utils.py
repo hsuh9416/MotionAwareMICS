@@ -85,7 +85,7 @@ def get_base_dataloader(args):
     trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=args.batch_size, shuffle=True,
                                               num_workers=args.num_workers, pin_memory=True,
                                               drop_last=args.drop_last if hasattr(args, 'drop_last') else False)
-    testloader = torch.utils.data.DataLoader(dataset=testset, batch_size=args.test_batch_size, shuffle=False,
+    testloader = torch.utils.data.DataLoader(dataset=testset, batch_size=args.batch_size, shuffle=False,
                                              num_workers=args.num_workers, pin_memory=True)
 
     return trainset, trainloader, testloader
