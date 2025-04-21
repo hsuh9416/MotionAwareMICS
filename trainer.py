@@ -340,7 +340,7 @@ class MICSTrainer:
             {'params': self.model.fc.parameters(), 'lr': self.args.learning_rate}], # Fully connected layer
             momentum=0.9, # Speed up the slope and suppress the sedation
             nesterov=True, # Move in the corrected direction, move in the momentum direction
-            weight_decay=self.args.decay) # L2 regularization
+            weight_decay=0.005) # L2 regularization
 
         # Scheduler settings - Adjusting learning rate: STEP method
         base_scheduler = torch.optim.lr_scheduler.StepLR(base_optimizer, step_size=self.args.step_size, gamma=self.args.gamma)
