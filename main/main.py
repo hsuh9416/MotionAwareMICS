@@ -4,10 +4,9 @@ import shutil
 import random
 import numpy as np
 import torch
-import torch.nn as nn
 
 # Import user-defined modules
-from config import Config
+from conf.config import Config
 from data.dataloader.data_utils import set_up_datasets, get_dataloader
 from model.mics import MICS  # MICS model with motion-aware features
 from train import train_base, train_inc  # training methods
