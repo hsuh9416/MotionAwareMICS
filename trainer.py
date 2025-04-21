@@ -336,7 +336,7 @@ class MICSTrainer:
 
         # Optimizer settings - Performance enhancement: Momentum and Nesterov acceleration
         base_optimizer = torch.optim.SGD([
-            {'param': self.model.encoder.parameters(), 'lr': self.args.learning_rate}, # Encoder
+            {'params': self.model.encoder.parameters(), 'lr': self.args.learning_rate}, # Encoder
             {'params': self.model.fc.parameters(), 'lr': self.args.learning_rate}], # Fully connected layer
             momentum=0.9, # Speed up the slope and suppress the sedation
             nesterov=True, # Move in the corrected direction, move in the momentum direction
