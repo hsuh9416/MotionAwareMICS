@@ -3,7 +3,6 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
-from tqdm import tqdm
 
 # Calculating the normalized variance (nVAR)
 def compute_nVar(model, dataloader, num_classes):
