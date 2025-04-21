@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 
 from data.dataloader.data_utils import get_dataloader
-from evaluate import compute_nVar
+from evaluate.evaluate import compute_nVar
 
 def accuracy_counting(logits, label):
     """ Accuracy by counting """
