@@ -75,7 +75,7 @@ class MICS(nn.Module):
             frame_features = []
             for t in range(T):
                 frame = x[:, :, t]  # [B, C, H, W]
-                frame_feat = self.backbone.features(frame)
+                frame_feat = self.encoder.features(frame)
                 frame_features.append(frame_feat)
 
             # Average features across time
