@@ -1,12 +1,16 @@
 import os
+import numpy as np
 import math
 import datetime
 from copy import deepcopy
-from data.dataloader.data_utils import *
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
+
+from data.dataloader.data_utils import get_dataloader
+from evaluate import compute_nVar
 
 def accuracy_counting(logits, label):
     """ Accuracy by counting """
@@ -355,8 +359,8 @@ class MICSTrainer:
         self.model = self.average_embedding(train_set, testloader.dataset.transform)
 
         # Evaluation by test
-        test_acc, test_loss = self.test(self.model, testloader, self.args, 0)
-        print(f'[Test - Base session] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}')
+        test_acc, test_loss, test_nvar = self.test(self.model, testloader, self.args, 0)
+        print(f'[Test - Base session] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}, nVAR = {round(test_nvar, 2)}')
 
         ### 2. Incremental session training ###
 
@@ -391,8 +395,8 @@ class MICSTrainer:
             self.model = self.average_embedding_inc(trainloader, np.unique(train_set.targets)) # Embedding
 
             # Evaluation by test
-            test_acc, test_loss = self.test(self.model, testloader, self.args, session)
-            print(f'[Test - Increment session {session}] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}')
+            test_acc, test_loss, test_nvar = self.test(self.model, testloader, self.args, session)
+            print(f'[Test - Increment session {session}] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}, nVAR = {round(test_nvar, 2)}')
 
         # Save the final model
         save_model_dir = os.path.join(self.save_path, f'final_acc.pth')
@@ -481,7 +485,18 @@ class MICSTrainer:
             self.results['acc_new'][session] = top1_new
             self.results['acc_new2'][session] = top1_new2
 
-        return self.results['acc'][session], avg_loss.item()
+            # Compute nVAR
+            cur_num_classes = args.base_class + session * args.way
+            nvar = compute_nVar(model, testloader, cur_num_classes, session)
+
+            if not hasattr(self, 'nvar_values'):
+                self.nvar_values = []
+            if len(self.nvar_values) <= session:
+                self.nvar_values.append(nvar)
+            else:
+                self.nvar_values[session] = nvar
+
+        return self.results['acc'][session], avg_loss.item(), nvar
 
     def print_table(self, results, args):
         print("{:<13}{}".format("Pretraining:", args.base_mode.split('_')[-1]))
