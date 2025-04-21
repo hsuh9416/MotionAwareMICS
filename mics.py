@@ -16,14 +16,14 @@ class MICS(nn.Module):
 
         # Feature Extractor
         if args.dataset == 'cifar100':
-            self.encoder = resnet20()
+            self.encoder = resnet20(num_classes=args.num_classes)
             self.num_features = 64
         else:  # Motion dataset 'ucf101'
-            self.encoder = resnet18()
+            self.encoder = resnet18(num_classes=args.num_classes)
             self.num_features = 512
 
         # Init classifier
-        self.fc = nn.Linear(self.num_features, self.args.num_workers, bias=False)
+        self.fc = nn.Linear(self.num_features, args.num_classes, bias=False)
         nn.init.zeros_(self.fc.weight) # Init weights as zeros
 
     def encode(self, x):

@@ -52,7 +52,7 @@ class BasicBlock(nn.Module):
         return out
 
 class ResNet18(nn.Module):
-    def __init__(self, block, layers, num_classes=10, downsample=None, groups=1,
+    def __init__(self, block, layers, num_classes=100, downsample=None, groups=1,
                  width_per_group=64, dilation=1, replace_stride_with_dilation=None):
         super(ResNet18, self).__init__()
         self.in_planes = 64
@@ -153,7 +153,7 @@ class ResNet18(nn.Module):
         return out, new_labels, mix_label_mask
 
 class ResNet20(nn.Module):
-    def __init__(self, block, layers, num_classes=10):
+    def __init__(self, block, layers, num_classes=100):
         super(ResNet20, self).__init__()
         self.in_planes = 16
         self.num_classes = num_classes
