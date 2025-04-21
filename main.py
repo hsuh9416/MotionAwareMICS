@@ -6,10 +6,10 @@ import numpy as np
 import torch
 
 # Import user-defined modules
-from conf.config import Config
+from config import Config
 from data.dataloader.data_utils import set_up_datasets, get_dataloader
-from model.mics import MICS  # MICS model with motion-aware features
-from train.trainer import MICSTrainer
+from mics import MICS  # MICS model with motion-aware features
+from trainer import MICSTrainer
 
 # Seed setting for reproducibility
 def set_seed(seed=42):
