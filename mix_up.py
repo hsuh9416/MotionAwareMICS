@@ -48,9 +48,11 @@ def middle_label_mix_process(label1, label2, num_base_classes, lamb, gamma):
         zero_stack = None
 
     # Paper 4.1 Construction of Mix-up Samples: soft labeling process - Formula (3)
+    lamb = lamb.item() if torch.is_tensor(lamb) else lamb
+    gamma = gamma.item() if torch.is_tensor(gamma) else gamma
     slope = 1 / (1 - gamma) # 1 / (1 - gamma)
-    y1 = np.max((1 - lamb - gamma) * slope, 0) # y1 = max((1 - lambda - gamma)/(1 - gamma), 0)
-    y2 = np.max((lamb - gamma) * slope, 0) # y2 = max((lambda - gamma)/(1 - gamma), 0)
+    y1 = np.maximum((1 - lamb - gamma) * slope, 0) # y1 = max((1 - lambda - gamma)/(1 - gamma), 0)
+    y2 = np.maximum((lamb - gamma) * slope, 0) # y2 = max((lambda - gamma)/(1 - gamma), 0)
     y3 = (1 - y1 - y2) # y3 = 1- y1 - y2
 
     if zero_stack is not None:
