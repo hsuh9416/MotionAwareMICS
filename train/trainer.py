@@ -48,27 +48,27 @@ class MICSTrainer:
         super().__init__(args)
         self.args = args
         self.model = model
-        self.results = self.set_acc_table(self.args) # Init the accuracy table
+        self.results = self.set_acc_table() # Init the accuracy table
         self.save_path = self.set_save_path() # Save the model
 
         self.best_model_dict = self.model.state_dict() # Init the best model dict by initial state dict
 
-    def set_acc_table(self, args):
+    def set_acc_table(self):
         """ Set the accuracy table of the model """
         results = dict()
-        results["train_acc"] = [list()] * args.sessions
-        results["train_loss"] = [list()] * args.sessions
-        results["train_nVAR"] = np.zeros([args.sessions])
-        results["test_nVAR"] = np.zeros([args.sessions])
-        results["acc"] = np.zeros([args.sessions])
-        results["acc_base"] = np.zeros([args.sessions])
-        results["acc_novel"] = np.zeros([args.sessions])
-        results["acc_old"] = np.zeros([args.sessions])
-        results["acc_new"] = np.zeros([args.sessions])
-        results["acc_base2"] = np.zeros([args.sessions])
-        results["acc_novel2"] = np.zeros([args.sessions])
-        results["acc_old2"] = np.zeros([args.sessions])
-        results["acc_new2"] = np.zeros([args.sessions])
+        results["train_acc"] = [list()] * self.args.sessions
+        results["train_loss"] = [list()] * self.args.sessions
+        results["train_nVAR"] = np.zeros([self.args.sessions])
+        results["test_nVAR"] = np.zeros([self.args.sessions])
+        results["acc"] = np.zeros([self.args.sessions])
+        results["acc_base"] = np.zeros([self.args.sessions])
+        results["acc_novel"] = np.zeros([self.args.sessions])
+        results["acc_old"] = np.zeros([self.args.sessions])
+        results["acc_new"] = np.zeros([self.args.sessions])
+        results["acc_base2"] = np.zeros([self.args.sessions])
+        results["acc_novel2"] = np.zeros([self.args.sessions])
+        results["acc_old2"] = np.zeros([self.args.sessions])
+        results["acc_new2"] = np.zeros([self.args.sessions])
 
         return results
 
@@ -87,18 +87,18 @@ class MICSTrainer:
         current_mode = model.mode
 
         # Dataloader without augmentation
-        trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=128,
+        train_loader = torch.utils.data.DataLoader(dataset=trainset, batch_size=128,
                                                   num_workers=8, pin_memory=True, shuffle=False)
 
         # Replace the transform in the linked data loader with the transform used in the test set.
-        trainloader.dataset.transform = transform
+        train_loader.dataset.transform = transform
 
         embedding_list = []
         label_list = []
 
         # Embedding
         with torch.no_grad(): # pure forwarding without gradient
-            for i, batch in enumerate(trainloader):
+            for i, batch in enumerate(train_loader):
                 data, label = [_.cuda() for _ in batch]
                 model.mode = 'encoder' # Encoder mode
                 embedding = model(data) # Feature extraction
@@ -123,7 +123,7 @@ class MICSTrainer:
         # Calculate prototypes by class
         proto_list = []
         for class_index in range(self.args.base_class):
-            data_index = (label_list == class_index).nonzero() # nonzero: returns the indices of all non-zero elements of input tensor.
+            data_index = (label_list == class_index).nonzero() # nonzero: returns all non-zero elements' indices of the input tensor.
             embedding_this = embedding_list[data_index.squeeze(-1)] # [N, 1] -> [N] then embedding for each data point by index
             embedding_mean = embedding_this.mean(0) # Averaging
             proto_list.append(embedding_mean)
@@ -148,7 +148,7 @@ class MICSTrainer:
         # Update prototype weights
         new_fc = []
         for class_index in class_list:
-            data_index = float(label == class_index).nonzero()  # nonzero: returns the indices of all non-zero elements of input tensor.
+            data_index = float(label == class_index).nonzero() # nonzero: returns all non-zero elements' indices of the input tensor.
             embedding = data[data_index.squeeze(-1)] # [N, 1] -> [N] then embedding for each data point by index
             proto = embedding.mean(0) # Averaging
             new_fc.append(proto)
@@ -222,12 +222,11 @@ class MICSTrainer:
         else:
             return model, None
 
-    def base_train(self, trainloader, optimizer, scheduler, epoch):
+    def base_train(self, train_loader, optimizer, scheduler, epoch):
         """ Base session training """
         # Init objects to compute average loss and accuracy
         avg_loss = Averager()
         avg_acc = Averager()
-        best_model_dict = None
 
         # Init BCE loss function
         bce_loss = nn.BCELoss().cuda() # BCE function
@@ -237,7 +236,7 @@ class MICSTrainer:
         model = self.model.train()
 
         # Init tqdm(progress bar)
-        tqdm_gen = tqdm(trainloader, desc='[Base] Epoch 0')
+        tqdm_gen = tqdm(train_loader, desc='[Base] Epoch 0')
 
         # For each epoch
         for i, batch in enumerate(tqdm_gen, 1):
@@ -280,15 +279,14 @@ class MICSTrainer:
 
         return avg_acc.val(), avg_loss.val()
 
-    def inc_train(self, model, trainloader, optimizer, scheduler, epoch, args, P_st_idx=None, session=None):
+    def inc_train(self, model, train_loader, optimizer, scheduler, epoch, args, P_st_idx=None):
         tl = Averager()
         ta = Averager()
         bce_loss = torch.nn.BCELoss().cuda()
         softmax = torch.nn.Softmax(dim=1).cuda()
-        train_class = args.base_class + session * args.way
 
         model = model.train()
-        tqdm_gen = tqdm(trainloader)
+        tqdm_gen = tqdm(train_loader)
 
         for i, batch in enumerate(tqdm_gen, 1):
             num_loss, loss, acc = 0, 0., 0.
@@ -326,7 +324,7 @@ class MICSTrainer:
         return tl, ta
 
     def train(self):
-        """ Comprahensive training function """
+        """ Comprehensive training function """
         # 0. Global initialization
         best_acc = 0.0
         best_loss = 0.0
@@ -334,13 +332,13 @@ class MICSTrainer:
 
         ### 1. Base session training ###
         # Get dataloader
-        train_set, trainloader, testloader = get_dataloader(self.args, 0)
+        train_set, train_loader, test_loader = get_dataloader(self.args, 0)
 
         # Optimizer settings - Performance enhancement: Momentum and Nesterov acceleration
         base_optimizer = torch.optim.SGD([
             {'param': self.model.encoder.parameters(), 'lr': self.args.learning_rate}, # Encoder
             {'params': self.model.fc.parameters(), 'lr': self.args.learning_rate}], # Fully connected layer
-            momentum=0.9, # Accelerate the slope and suppress the sedation
+            momentum=0.9, # Speed up the slope and suppress the sedation
             nesterov=True, # Move in the corrected direction, move in the momentum direction
             weight_decay=self.args.decay) # L2 regularization
 
@@ -348,7 +346,7 @@ class MICSTrainer:
         base_scheduler = torch.optim.lr_scheduler.StepLR(base_optimizer, step_size=self.args.step_size, gamma=self.args.gamma)
 
         for epoch in range(self.args.base_epochs):
-            train_acc, train_loss = self.base_train(trainloader, base_optimizer, base_scheduler, epoch)
+            train_acc, train_loss = self.base_train(train_loader, base_optimizer, base_scheduler, epoch)
             base_scheduler.step()
 
             self.results["train_acc"][0] = train_acc
@@ -363,16 +361,16 @@ class MICSTrainer:
                 self.best_model_dict = deepcopy(self.model.state_dict())
 
         # Compute nVar
-        avg_nvar = compute_nVar(self.model, trainloader, self.args.base_class)
+        avg_nvar = compute_nVar(self.model, train_loader, self.args.base_class)
         self.results['train_nVAR'][0](avg_nvar)
 
         print(f'[Train - Base session] Accuracy = {round(best_loss, 2)}, Loss = {round(best_loss, 2)}, nVAR = {round(avg_nvar, 2)}')
 
         # Apply protype classification to the trained model
-        self.model = self.average_embedding(train_set, testloader.dataset.transform)
+        self.model = self.average_embedding(train_set, test_loader.dataset.transform)
 
         # Evaluation by test
-        test_acc, test_loss, test_nvar = self.test(self.model, testloader, self.args, 0)
+        test_acc, test_loss, test_nvar = self.test(self.model, test_loader, self.args, 0)
         self.results['test_nVAR'][0](test_nvar)
         print(f'[Test - Base session] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}, nVAR = {round(test_nvar, 2)}')
 
@@ -383,18 +381,18 @@ class MICSTrainer:
         for session in range(1, self.args.sessions):
 
             # Get dataloader
-            train_set, trainloader, testloader = get_dataloader(self.args, session)
+            train_set, train_loader, test_loader = get_dataloader(self.args, session)
 
-            train_transform = deepcopy(trainloader.dataset.transform) # Copy the transform
+            train_transform = deepcopy(train_loader.dataset.transform) # Copy the transform
             # Replace the transform in the linked data loader with the transform used in the test set
-            trainloader.dataset.transform = testloader.dataset.transform
-            self.model = self.average_embedding_inc(trainloader, np.unique(train_set.targets))  # Embedding
-            trainloader.dataset.transform = train_transform # Restore the transform
+            train_loader.dataset.transform = test_loader.dataset.transform
+            self.model = self.average_embedding_inc(train_loader, np.unique(train_set.targets))  # Embedding
+            train_loader.dataset.transform = train_transform # Restore the transform
 
             # Incremental MICS training
             for epoch in range(self.args.inc_epochs):
                 self.model, P_st_idx = self.update_param(self.model, self.best_model_dict)
-                train_acc, train_loss = self.inc_train(self.model, trainloader, optimizer, scheduler, epoch, self.args, P_st_idx, session)
+                train_acc, train_loss = self.inc_train(self.model, train_loader, optimizer, scheduler, epoch, self.args, P_st_idx)
 
                 self.results["train_acc"][session] = train_acc
                 self.results["train_loss"][session] = train_loss
@@ -411,15 +409,15 @@ class MICSTrainer:
 
             # Compute nVar
             cur_num_classes = self.args.base_class + session * self.args.way
-            avg_nvar = compute_nVar(self.model, trainloader, cur_num_classes)
+            avg_nvar = compute_nVar(self.model, train_loader, cur_num_classes)
             self.results['train_nVAR'][session](avg_nvar)
 
             # Replace the transform in the linked data loader with the transform used in the test set.
-            trainloader.dataset.transform = testloader.dataset.transform
-            self.model = self.average_embedding_inc(trainloader, np.unique(train_set.targets)) # Embedding
+            train_loader.dataset.transform = train_loader.dataset.transform
+            self.model = self.average_embedding_inc(train_loader, np.unique(train_set.targets)) # Embedding
 
             # Evaluation by test
-            test_acc, test_loss, test_nvar = self.test(self.model, testloader, self.args, session)
+            test_acc, test_loss, test_nvar = self.test(self.model, test_loader, self.args, session)
             self.results['test_nVAR'][session](test_nvar)
             print(f'[Test - Increment session {session}] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}, nVAR = {round(test_nvar, 2)}')
 
@@ -429,9 +427,9 @@ class MICSTrainer:
 
         print('\n*************** Final results ***************')
         print(self.results['max_acc'], '\n')
-        self.print_table(self.results, self.args)
+        self.print_table()
 
-    def test(self, model, testloader, args, session):
+    def test(self, model, test_loader, args, session):
         """ Test session training """
         test_class = args.base_class + session * args.way
 
@@ -442,7 +440,7 @@ class MICSTrainer:
         label = []
 
         with torch.no_grad():
-            for i, batch in enumerate(testloader, 1):
+            for i, batch in enumerate(test_loader, 1):
                 data, test_label = [_.cuda() for _ in batch]
                 # Compute loss by cross-entropy function
                 logits = model(data)
@@ -512,13 +510,14 @@ class MICSTrainer:
 
             # Compute nVAR
             cur_num_classes = args.base_class + session * args.way
-            nvar = compute_nVar(model, testloader, cur_num_classes)
+            nvar = compute_nVar(model, test_loader, cur_num_classes)
+            nvar = compute_nVar(model, test_loader, cur_num_classes)
 
         return self.results['acc'][session], avg_loss.val(), nvar
 
-    def print_table(self, results, args):
-        print("{:<13}{}".format("Pretraining:", args.base_mode.split('_')[-1]))
-        print("{:<13}{}".format("Similarity:", args.new_mode.split('_')[-1]))
+    def print_table(self):
+        print("{:<13}{}".format("Pretraining:", self.args.base_mode.split('_')[-1]))
+        print("{:<13}{}".format("Similarity:", self.args.new_mode.split('_')[-1]))
 
         str_head = "{:<9}".format('')
         str_acc = "{:<9}".format('Acc:')
@@ -527,13 +526,13 @@ class MICSTrainer:
         str_acc_old = "{:<9}".format('Old:')
         str_acc_new = "{:<9}".format('New:')
 
-        for i in range(len(results['acc'])):
+        for i in range(len(self.results['acc'])):
             str_head = str_head + "{:<9}".format('sess' + str(int(i + 1)))
-            str_acc = str_acc + "{:<9}".format(str(round(results['acc'][i] * 100.0, 2)) + "%")
-            str_acc_base = str_acc_base + "{:<9}".format(str(round(results['acc_base'][i] * 100.0, 2)) + "%")
-            str_acc_novel = str_acc_novel + "{:<9}".format(str(round(results['acc_novel'][i] * 100.0, 2)) + "%")
-            str_acc_old = str_acc_old + "{:<9}".format(str(round(results['acc_old'][i] * 100.0, 2)) + "%")
-            str_acc_new = str_acc_new + "{:<9}".format(str(round(results['acc_new'][i] * 100.0, 2)) + "%")
+            str_acc = str_acc + "{:<9}".format(str(round(self.results['acc'][i] * 100.0, 2)) + "%")
+            str_acc_base = str_acc_base + "{:<9}".format(str(round(self.results['acc_base'][i] * 100.0, 2)) + "%")
+            str_acc_novel = str_acc_novel + "{:<9}".format(str(round(self.results['acc_novel'][i] * 100.0, 2)) + "%")
+            str_acc_old = str_acc_old + "{:<9}".format(str(round(self.results['acc_old'][i] * 100.0, 2)) + "%")
+            str_acc_new = str_acc_new + "{:<9}".format(str(round(self.results['acc_new'][i] * 100.0, 2)) + "%")
 
         print(str_head)
         print(str_acc)
@@ -548,11 +547,11 @@ class MICSTrainer:
         str_acc_old2 = "{:<9}".format('Old2:')
         str_acc_new2 = "{:<9}".format('New2:')
 
-        for i in range(len(results['acc'])):
-            str_acc_base2 = str_acc_base2 + "{:<9}".format(str(round(results['acc_base2'][i] * 100.0, 2)) + "%")
-            str_acc_novel2 = str_acc_novel2 + "{:<9}".format(str(round(results['acc_novel2'][i] * 100.0, 2)) + "%")
-            str_acc_old2 = str_acc_old2 + "{:<9}".format(str(round(results['acc_old2'][i] * 100.0, 2)) + "%")
-            str_acc_new2 = str_acc_new2 + "{:<9}".format(str(round(results['acc_new2'][i] * 100.0, 2)) + "%")
+        for i in range(len(self.results['acc'])):
+            str_acc_base2 = str_acc_base2 + "{:<9}".format(str(round(self.results['acc_base2'][i] * 100.0, 2)) + "%")
+            str_acc_novel2 = str_acc_novel2 + "{:<9}".format(str(round(self.results['acc_novel2'][i] * 100.0, 2)) + "%")
+            str_acc_old2 = str_acc_old2 + "{:<9}".format(str(round(self.results['acc_old2'][i] * 100.0, 2)) + "%")
+            str_acc_new2 = str_acc_new2 + "{:<9}".format(str(round(self.results['acc_new2'][i] * 100.0, 2)) + "%")
 
         print(str_acc_base2)
         print(str_acc_novel2)
