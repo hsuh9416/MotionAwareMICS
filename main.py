@@ -9,7 +9,6 @@ import torch
 from conf.config import Config
 from data.dataloader.data_utils import set_up_datasets, get_dataloader
 from model.mics import MICS  # MICS model with motion-aware features
-from train import train_base, train_inc  # training methods
 from train.trainer import MICSTrainer
 
 # Seed setting for reproducibility
