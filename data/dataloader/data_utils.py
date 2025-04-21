@@ -130,7 +130,7 @@ def get_new_dataloader(args, session):
                                              step_between_clips=args.step_between_clips,
                                              fold=args.fold)
 
-    testloader = torch.utils.data.DataLoader(dataset=testset, batch_size=args.test_batch_size, shuffle=False,
+    testloader = torch.utils.data.DataLoader(dataset=testset, batch_size=args.batch_size, shuffle=False,
                                              num_workers=args.num_workers, pin_memory=True)
 
     return trainset, trainloader, testloader
