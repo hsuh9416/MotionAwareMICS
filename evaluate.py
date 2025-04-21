@@ -21,10 +21,10 @@ def compute_nVar(model, dataloader, num_classes):
             features = model.module.encode(data)
 
             # classification by class
-            for i in range(len(label)):
-                class_idx = label[i].item()
+            for j in range(len(label)):
+                class_idx = label[j].item()
                 if class_idx < num_classes:  # Only consider current included classes
-                    features_by_class[class_idx].append(features[i].detach().cpu())
+                    features_by_class[class_idx].append(features[j].detach().cpu())
 
     # Find the closest centroid of each class
     nearest_prototypes = {}
@@ -48,7 +48,7 @@ def compute_nVar(model, dataloader, num_classes):
             prototype = class_prototypes[class_idx].cpu()
 
             # Paper 3.1. Compact and Separable Representations: nVAR - Formula (1)
-            # inter-class seperability (Mean squared distance from class centroid)
+            # inter-class seperability (Mean-squared distance from class centroid)
             intra_var = torch.mean(torch.norm(features - prototype, dim=1) ** 2).item()
 
             # intra-class compactness (Mean squared distance from nearest centroid)
@@ -177,7 +177,7 @@ def visualize_acc(history_plain, history_motion, config):
     methods = ['Plain MICS', 'Motion-Aware MICS']
     pd_values = [pd_plain, pd_motion]
 
-    # Create bar graph
+    # Create a bar graph
     bars = plt.bar(methods, pd_values, color=['#3498db', '#e74c3c'])
 
     # Show value above bar
@@ -198,7 +198,7 @@ def visualize_acc(history_plain, history_motion, config):
 
     final_acc = [history_plain[-1], history_motion[-1]]
 
-    # Create bar graph
+    # Create a bar graph
     bars = plt.bar(methods, final_acc, color=['#3498db', '#e74c3c'])
 
     # Show value above bar

@@ -28,13 +28,6 @@ def run_process(config):
     # Initialize trainer
     trainer = MICSTrainer(model, config)
 
-    # Base session Training
-    print("Training base session...")
-
-    # Load base dataset
-    trainset, trainloader, testloader = get_dataloader(config, 0)
-    model = train_base(model, trainloader, config)
-
     # Train and Evaluate the model
     trainer.train()
 

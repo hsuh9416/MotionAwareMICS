@@ -44,7 +44,7 @@ def middle_label_mix_process(label1, label2, num_base_classes, lamb, gamma):
     else:
         zero_stack = None
 
-    # Paper 4.1 Construction of Mixup Samples: soft labeling process - Formula (3)
+    # Paper 4.1 Construction of Mix-up Samples: soft labeling process - Formula (3)
     slope = 1 / (1 - gamma) # 1 / (1 - gamma)
     y1 = np.max((1 - lamb - gamma) * slope, 0) # y1 = max((1 - lambda - gamma)/(1 - gamma), 0)
     y2 = np.max((lamb - gamma) * slope, 0) # y2 = max((lambda - gamma)/(1 - gamma), 0)
