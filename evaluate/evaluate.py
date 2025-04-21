@@ -62,7 +62,7 @@ def compute_nVar(model, dataloader, num_classes):
     avg_nvar = sum(nvar_values) / len(nvar_values) if nvar_values else float('inf')
     return avg_nvar
 
-# PCA visualization function
+# PCA visualization function (Per session)
 def visualize_pca(model, test_loaders, current_classes, config, session_idx):
     model.eval()
     all_features = []
@@ -113,7 +113,7 @@ def visualize_pca(model, test_loaders, current_classes, config, session_idx):
     plt.savefig(f'/content/drive/MyDrive/MotionAwareMICS/results/pca_session_{session_idx}.png', dpi=300)
     plt.close()
 
-# nVAR visualization function
+# nVAR visualization function (X: session index, Y: nVAR)
 def visualize_nVar(nVar_plain, nVar_motion, config):
     sessions = list(range(config.num_sessions + 1))
 
@@ -127,7 +127,7 @@ def visualize_nVar(nVar_plain, nVar_motion, config):
     plt.legend()
     plt.savefig('/content/drive/MyDrive/MotionAwareMICS/results/nvar_comparison.png', dpi=300)
 
-# Accuracy visualization function
+# Accuracy/Loss visualization function (X: epochs, Y: nVAR)
 def visualize_acc(history_plain, history_motion, config):
     # Visualize accuracy by session
     plt.figure(figsize=(12, 8))

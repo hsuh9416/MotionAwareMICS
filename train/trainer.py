@@ -137,6 +137,8 @@ class MICSTrainer:
         return model
 
     def average_embedding_inc(self, dataloader, class_list):
+
+        data, label = None, None
         model = self.model.eval()
 
         for batch in dataloader:
@@ -146,7 +148,7 @@ class MICSTrainer:
         # Update prototype weights
         new_fc = []
         for class_index in class_list:
-            data_index = (label == class_index).nonzero()  # nonzero: returns the indices of all non-zero elements of input tensor.
+            data_index = float(label == class_index).nonzero()  # nonzero: returns the indices of all non-zero elements of input tensor.
             embedding = data[data_index.squeeze(-1)] # [N, 1] -> [N] then embedding for each data point by index
             proto = embedding.mean(0) # Averaging
             new_fc.append(proto)
@@ -276,7 +278,7 @@ class MICSTrainer:
             loss.backward()
             optimizer.step()
 
-        return avg_acc.item(), avg_loss.item()
+        return avg_acc.val(), avg_loss.val()
 
     def inc_train(self, model, trainloader, optimizer, scheduler, epoch, args, P_st_idx=None, session=None):
         tl = Averager()
@@ -319,8 +321,8 @@ class MICSTrainer:
                     for idx in P_st_idx[k]:
                         v.data[idx] = updated_param_dict[k].data[idx]
 
-        tl = tl.item()
-        ta = ta.item()
+        tl = tl.val()
+        ta = ta.val()
         return tl, ta
 
     def train(self):
@@ -512,7 +514,7 @@ class MICSTrainer:
             cur_num_classes = args.base_class + session * args.way
             nvar = compute_nVar(model, testloader, cur_num_classes)
 
-        return self.results['acc'][session], avg_loss.item(), nvar
+        return self.results['acc'][session], avg_loss.val(), nvar
 
     def print_table(self, results, args):
         print("{:<13}{}".format("Pretraining:", args.base_mode.split('_')[-1]))
