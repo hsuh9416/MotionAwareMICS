@@ -5,107 +5,63 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 
-# Evaluation function
-def evaluate(model, test_loaders, config, session):
-    model.eval()
-    acc_per_session = []
-
-    if session == 0: # First session
-        print("Base session evaluation:")
-
-    with torch.no_grad():
-        # Evaluate all sessions
-        for session_idx, test_loader in enumerate(test_loaders):
-            correct = 0
-            total = 0
-
-            for inputs, targets in tqdm(test_loader):
-                inputs, targets = inputs.to(config.device), targets.to(config.device)
-                outputs = model(inputs)
-
-                # NCM classification (processed similarly to the existing MICS classification method)
-                _, predicted = outputs.max(1)
-
-                total += targets.size(0)
-                correct += predicted.eq(targets).sum().item()
-
-            session_acc = 100. * correct / total
-            acc_per_session.append(session_acc)
-            print(f'Session {session_idx} Accuracy: {session_acc:.2f}%')
-
-    # Calculating the Performance Dropping Rate
-    pd = acc_per_session[0] - acc_per_session[-1]
-    print(f'Base Accuracy: {acc_per_session[0]:.2f}%, Final Accuracy: {acc_per_session[-1]:.2f}%')
-    print(f'Performance Dropping Rate: {pd:.2f}%')
-
-    return acc_per_session
-
 # Calculating the normalized variance (nVAR)
-def compute_nVar(model, test_loaders, current_classes, config):
-    model.eval()
-    class_features = {i: [] for i in range(current_classes)}
+def compute_nVar(model, dataloader, num_classes):
+    """ Compute the normalized variance (nVAR) for each class."""
+    model.eval() # Evaluation mode
 
-    # Collecting class-specific characteristics
+    # Compute prototype
+    class_prototypes = model.module.fc.weight.data[:num_classes].clone()
+
+    # feature vector by class
+    features_by_class = {i: [] for i in range(num_classes)}
+
     with torch.no_grad():
-        for session_idx, test_loader in enumerate(test_loaders):
-            for inputs, targets in tqdm(test_loader):
-                inputs, targets = inputs.to(config.device), targets.to(config.device)
-                features = model(inputs, return_features=True)
+        for i, batch in enumerate(dataloader):
+            data, label = [_.cuda() for _ in batch]
+            features = model.module.encode(data)
 
-                for i in range(inputs.size(0)):
-                    class_idx = targets[i].item()
-                    if class_idx < current_classes:  # Consider only the classes learned so far
-                        class_features[class_idx].append(features[i].cpu().numpy())
+            # classification by class
+            for i in range(len(label)):
+                class_idx = label[i].item()
+                if class_idx < num_classes:  # Only consider current included classes
+                    features_by_class[class_idx].append(features[i].detach().cpu())
 
-    # class-centric calculation
-    class_centroids = {}
-    for class_idx in range(current_classes):
-        if class_features[class_idx]:
-            class_centroids[class_idx] = np.mean(np.stack(class_features[class_idx]), axis=0)
+    # Find the closest centroid of each class
+    nearest_prototypes = {}
+    for i in range(num_classes):
+        dists = []
+        for j in range(num_classes):
+            if i != j:
+                dist = torch.norm(class_prototypes[i] - class_prototypes[j], p=2)
+                dists.append((j, dist.item()))
 
-    # Find the nearest center of interference
-    nearest_interfering_centroids = {}
-    for class_idx in range(current_classes):
-        if class_idx not in class_centroids:
-            continue
+        if dists:  # If there are other classes
+            nearest_idx, nearest_dist = min(dists, key=lambda x: x[1])
+            nearest_prototypes[i] = (nearest_idx, nearest_dist)
 
-        min_dist = float('inf')
-        nearest_idx = None
 
-        for other_idx in range(current_classes):
-            if other_idx != class_idx and other_idx in class_centroids:
-                dist = np.sum((class_centroids[class_idx] - class_centroids[other_idx]) ** 2)
-                if dist < min_dist:
-                    min_dist = dist
-                    nearest_idx = other_idx
+    # Calculating within-class variance and normalized variance
+    nvar_values = []
+    for class_idx in range(num_classes):
+        if features_by_class[class_idx] and class_idx in nearest_prototypes:
+            features = torch.stack(features_by_class[class_idx])
+            prototype = class_prototypes[class_idx].cpu()
 
-        if nearest_idx is not None:
-            nearest_interfering_centroids[class_idx] = class_centroids[nearest_idx]
+            # Paper 3.1. Compact and Separable Representations: nVAR - Formula (1)
+            # inter-class seperability (Mean squared distance from class centroid)
+            intra_var = torch.mean(torch.norm(features - prototype, dim=1) ** 2).item()
 
-    # Compute nVAR
-    nVar_values = []
-    for class_idx in range(current_classes):
-        if class_idx not in class_centroids or class_idx not in nearest_interfering_centroids:
-            continue
+            # intra-class compactness (Mean squared distance from nearest centroid)
+            _, nearest_dist = nearest_prototypes[class_idx]
 
-        centroid = class_centroids[class_idx]
-        interfering_centroid = nearest_interfering_centroids[class_idx]
+            # nVAR for this class
+            nvar = intra_var / (nearest_dist ** 2)
+            nvar_values.append(nvar)
 
-        # Denominator: Square of the distance between the centers
-        denominator = np.sum((centroid - interfering_centroid) ** 2)
-
-        # Molecule: Variance of features within a class
-        variance_sum = 0
-        for feat in class_features[class_idx]:
-            variance_sum += np.sum((feat - centroid) ** 2)
-
-        if len(class_features[class_idx]) > 0:
-            numerator = variance_sum / len(class_features[class_idx])
-            nVar_values.append(numerator / denominator)
-
-    # Average nVAR
-    avg_nVar = np.mean(nVar_values)
-    return avg_nVar
+    # average nVAR for all classes
+    avg_nvar = sum(nvar_values) / len(nvar_values) if nvar_values else float('inf')
+    return avg_nvar
 
 # PCA visualization function
 def visualize_pca(model, test_loaders, current_classes, config, session_idx):

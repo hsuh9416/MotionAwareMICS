@@ -65,7 +65,7 @@ class MICSTrainer:
         results["acc_novel2"] = np.zeros([args.sessions])
         results["acc_old2"] = np.zeros([args.sessions])
         results["acc_new2"] = np.zeros([args.sessions])
-
+        results["nVAR"] = np.zeros([args.sessions])
         return results
 
     def set_save_path(self):
@@ -345,6 +345,9 @@ class MICSTrainer:
             train_acc, train_loss = self.base_train(trainloader, base_optimizer, base_scheduler, epoch)
             base_scheduler.step()
 
+
+
+
             # Save the best model
             if train_acc > best_acc or (train_acc == best_acc and train_loss < best_loss):
                 best_acc = train_acc
@@ -353,7 +356,11 @@ class MICSTrainer:
                 torch.save(dict(params=self.model.state_dict()), save_model_dir)
                 self.best_model_dict = deepcopy(self.model.state_dict())
 
-        print(f'[Train - Base session] Accuracy = {round(best_loss, 2)}, Loss = {round(best_loss, 2)}')
+        # Compute nVar
+        avg_nvar = compute_nVar(self.model, trainloader, self.args.base_class)
+        self.nvar_values[0](avg_nvar)
+
+        print(f'[Train - Base session] Accuracy = {round(best_loss, 2)}, Loss = {round(best_loss, 2)}, nVAR = {round(avg_nvar, 2)}')
 
         # Apply protype classification to the trained model
         self.model = self.average_embedding(train_set, testloader.dataset.transform)
@@ -381,6 +388,11 @@ class MICSTrainer:
             for epoch in range(self.args.inc_epochs):
                 self.model, P_st_idx = self.update_param(self.model, self.best_model_dict)
                 train_acc, train_loss = self.inc_train(self.model, trainloader, optimizer, scheduler, epoch, self.args, P_st_idx, session)
+
+                # Compute nVar
+                cur_num_classes = self.args.base_class + session * self.args.way
+                avg_nvar = compute_nVar(self.model, trainloader, cur_num_classes)
+                self.nvar_values[session](avg_nvar)
 
                 # Save the best model
                 if train_acc > best_acc or (train_acc == best_acc and train_loss < best_loss):
@@ -487,14 +499,7 @@ class MICSTrainer:
 
             # Compute nVAR
             cur_num_classes = args.base_class + session * args.way
-            nvar = compute_nVar(model, testloader, cur_num_classes, session)
-
-            if not hasattr(self, 'nvar_values'):
-                self.nvar_values = []
-            if len(self.nvar_values) <= session:
-                self.nvar_values.append(nvar)
-            else:
-                self.nvar_values[session] = nvar
+            nvar = compute_nVar(model, testloader, cur_num_classes)
 
         return self.results['acc'][session], avg_loss.item(), nvar
 
