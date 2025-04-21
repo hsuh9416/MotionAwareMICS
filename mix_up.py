@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 import matplotlib
+import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 matplotlib.use('agg')
 
