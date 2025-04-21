@@ -82,7 +82,7 @@ def get_base_dataloader(args):
                                              step_between_clips=args.step_between_clips,
                                              fold=args.fold)
 
-    trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=args.batch_size_base, shuffle=True,
+    trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=args.batch_size, shuffle=True,
                                               num_workers=args.num_workers, pin_memory=True,
                                               drop_last=args.drop_last if hasattr(args, 'drop_last') else False)
     testloader = torch.utils.data.DataLoader(dataset=testset, batch_size=args.test_batch_size, shuffle=False,
