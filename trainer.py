@@ -171,7 +171,7 @@ class MICSTrainer:
     def get_optimizer_new(self):
         optimizer = torch.optim.SGD([{'params': self.model.encoder.parameters(), 'lr': self.args.learning_rate},
                                      {'params': self.model.fc.parameters(), 'lr': 0}],
-                                    momentum=0.9, nesterov=True, weight_decay=self.args.decay)
+                                    momentum=0.9, nesterov=True, weight_decay=0.0005)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=self.args.step, gamma=self.args.gamma)
         return optimizer, scheduler
 

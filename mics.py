@@ -8,14 +8,14 @@ import cv2
 from resnet import resnet18, resnet20
 
 class MICS(nn.Module):
-    def __init__(self, config):
+    def __init__(self, args):
         super(MICS, self).__init__()
         self.mode = 'ft_cos'
-        self.config = config
-        self.device = config.device # Cuda
+        self.args = args
+        self.device = args.device # Cuda
 
         # Feature Extractor
-        if config.dataset == 'cifar100':
+        if args.dataset == 'cifar100':
             self.encoder = resnet20()
             self.num_features = 64
         else:  # Motion dataset 'ucf101'
@@ -23,7 +23,7 @@ class MICS(nn.Module):
             self.num_features = 512
 
         # Init classifier
-        self.fc = nn.Linear(self.num_features, self.config.num_workers, bias=False)
+        self.fc = nn.Linear(self.num_features, self.args.num_workers, bias=False)
         nn.init.zeros_(self.fc.weight) # Init weights as zeros
 
     def encode(self, x):
@@ -41,7 +41,7 @@ class MICS(nn.Module):
         # Temperature scaling is a hyperparameter applied to the softmax function and is used to adjust the output distribution of the model.
         # The lower the temperature, the higher the confidence of the classification.
         # T = 0.1, MICS has the concept of Boundary Thickness, so it has a relatively small value.
-        x = x * self.config.temperature
+        x = x * self.args.temperature
 
         return x
 
@@ -111,10 +111,10 @@ class MICS(nn.Module):
 
 # Motion-aware mixup implementation
 class MotionAwareMixup(nn.Module):
-    def __init__(self, config):
+    def __init__(self, args):
         super(MotionAwareMixup, self).__init__()
-        self.config = config
-        self.flow_alpha = config.flow_alpha
+        self.args = args
+        self.flow_alpha = args.flow_alpha
 
     def compute_motion_consistency(self, flow1, flow2):
         """Compute motion consistency between two optical flows"""
@@ -139,7 +139,7 @@ class MotionAwareMixup(nn.Module):
     def forward(self, frames1, frames2, lam):
         """Mix two video sequences with motion awareness"""
         # Skip motion awareness if disabled
-        if not self.config.use_motion:
+        if not self.args.use_motion:
             mixed_frames = lam * frames1 + (1 - lam) * frames2
             return mixed_frames, lam
 
