@@ -44,7 +44,7 @@ class BaseConfig:
             os.makedirs(self.model_dir, exist_ok=True)
 
         # MICS settings - based on Table 4 (Section 4.5) of the paper
-        self.st_ratio = 0.3  # session trainable parameter ratio
+        self.st_ratio = 0.01  # session trainable parameter ratio
         self.train = 'mixup_hidden'
         self.alpha = 0.5  # mixup_alpha - Parameters of the beta distribution
         # self.use_hard_positive_aug = False
