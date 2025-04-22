@@ -35,7 +35,7 @@ class BaseConfig:
         self.base_mode = 'ft_cos'  # Cosine classifier
         self.new_mode = 'avg_cos'  # Average data embedding / Cosine classifier
         # self.start_session = 0
-        self.model_dir = '/content/drive/MyDrive/MotionAwareMICS/model/'
+        self.model_dir = '/content/drive/MyDrive/MotionAwareMICS/results/model/'
 
         # MICS settings - based on Table 4 (Section 4.5) of the paper
         self.st_ratio = 0.01  # session trainable parameter ratio

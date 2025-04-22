@@ -55,7 +55,7 @@ class MICSTrainer:
         self.args = args
         self.model = model
         self.results = self.set_acc_table()  # Init the accuracy table
-        self.save_path = self.set_save_path()  # Save the model
+        self.save_path = self.args.model_dir # Save the model here
 
         self.best_model_dict = self.model.state_dict()  # Init the best model dict by initial state dict
 
@@ -77,15 +77,6 @@ class MICSTrainer:
         results["acc_new2"] = np.zeros([self.args.sessions])
 
         return results
-
-    def set_save_path(self):
-        """ Set the save path of the model """
-        time_str = datetime.datetime.now().strftime('%m%d%Y')
-        save_path = '%s/%s' % (self.args.dataset, time_str)  # e.g.ucf101/04202025
-        save_path = os.path.join('results', save_path)  # e.g.results/ucf101/04202025
-        os.makedirs(save_path, exist_ok=True)
-
-        return save_path
 
     def average_embedding(self, trainset, transform):
         """ replace fc.weight with the embedding average of train data """
@@ -383,7 +374,7 @@ class MICSTrainer:
                 save_model_dir = os.path.join(self.save_path, 'base_session_max_acc.pth')
                 torch.save(dict(params=self.model.state_dict()), save_model_dir)
                 self.best_model_dict = deepcopy(self.model.state_dict())
-
+                print("Model saved to {}".format(save_model_dir))
         # Compute nVar
         avg_nvar = compute_nVar(self.model, train_loader, self.args.base_class)
         self.results['train_nVAR'][0] = avg_nvar
