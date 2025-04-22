@@ -12,7 +12,6 @@ from tqdm import tqdm
 from data.dataloader.data_utils import get_dataloader
 from evaluate import compute_nVar
 
-
 def accuracy_counting(logits, label):
     """ Accuracy by counting """
     pred = torch.argmax(logits, dim=1)
@@ -241,7 +240,7 @@ class MICSTrainer:
         tot_acc = Averager()
 
         # Init BCE loss function
-        bce_loss = nn.BCELoss().cuda()  # BCE function
+        bce_loss = nn.BCEWithLogitsLoss().cuda()  # BCE function
         softmax = nn.Softmax(dim=1).cuda()  # Activation function
 
         # Set training mode
@@ -265,8 +264,11 @@ class MICSTrainer:
             elif re_label.shape[1] < softmax(output).shape[1]:
                 output = output[:, :re_label.shape[1]]
 
-            # Compute BCE loss
-            loss += bce_loss(softmax(output), re_label)
+            # Compute BCE loss on raw logits
+            # ensure target is float on the same device and clamped to [0,1]
+            target = re_label.float().clamp(0, 1).cuda()
+            loss += bce_loss(output, target)
+            # loss += bce_loss(softmax(output), re_label)
 
             # Compute accuracy
             acc += mix_up_accuracy_counting(output, label)[0] / 100.0  # percentage
@@ -294,7 +296,7 @@ class MICSTrainer:
     def inc_train(self, model, train_loader, optimizer, lrc, epoch, args, P_st_idx=None):
         tot_acc = Averager()
         tot_loss = Averager()
-        bce_loss = torch.nn.BCELoss().cuda()
+        bce_loss = torch.nn.BCEWithLogitsLoss().cuda()
         softmax = torch.nn.Softmax(dim=1).cuda()
 
         model = model.train()
@@ -304,14 +306,21 @@ class MICSTrainer:
             loss, acc = 0., 0.
             data, label = [_.cuda() for _ in batch]
 
-            output, retarget = model.forward_mix_up(args, data, label)
+            output, re_label = model.forward_mix_up(args, data, label)
 
-            if retarget.shape[1] > softmax(output).shape[1]:
-                retarget = retarget[:, :softmax(output).shape[1]]
-            elif retarget.shape[1] < softmax(output).shape[1]:
-                output = output[:, :retarget.shape[1]]
-            loss += bce_loss(softmax(output), retarget)
-            acc += mix_up_accuracy_counting(output, label)[0] * 0.01
+            if re_label.shape[1] > softmax(output).shape[1]:
+                retarget = re_label[:, :softmax(output).shape[1]]
+            elif re_label.shape[1] < softmax(output).shape[1]:
+                output = output[:, :re_label.shape[1]]
+
+            # Compute BCE loss on raw logits
+            # ensure target is float on the same device and clamped to [0,1]
+            target = re_label.float().clamp(0, 1).cuda()
+            loss += bce_loss(output, target)
+            # loss += bce_loss(softmax(output), re_label)
+
+            # Compute accuracy
+            acc += mix_up_accuracy_counting(output, label)[0] / 100.0
 
             tqdm_gen.set_description('Session 0, epo {}, lrc={:.4f},total loss={:.4f} acc={:.4f}'
                                      .format(epoch, lrc, loss.item(), acc))
