@@ -146,7 +146,7 @@ class ResNet18(nn.Module):
         # Third layer
         out = self.layer3(out)
 
-        # Layer mix after Thrid layer
+        # Layer mix after Third layer
         if layer_mix == 3:
             out, new_labels, mix_label_mask = middle_mixup_process(out, new_labels, num_base_classes, lamb, gamma=gamma)
 

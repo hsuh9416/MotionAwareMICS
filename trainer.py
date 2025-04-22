@@ -279,7 +279,7 @@ class MICSTrainer:
             # Process update
             tqdm_gen.set_description(
                 'Base Session, epoch {}, lrc={:.4f}, total loss={:.4f} acc={:.4f}'
-                .format(epoch, cur_lr, loss.item(), acc)
+                .format(epoch+1, cur_lr, loss.item(), acc)
             )
 
             # Update average loss and accuracy
@@ -385,6 +385,7 @@ class MICSTrainer:
                 self.best_model_dict = deepcopy(self.model.state_dict())
 
         # Compute nVar
+        print("Over here?")
         avg_nvar = compute_nVar(self.model, train_loader, self.args.base_class)
         self.results['train_nVAR'][0] = avg_nvar
 

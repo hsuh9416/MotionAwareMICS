@@ -39,7 +39,7 @@ def set_up_datasets(args):
         args.Dataset = CifarDataset
         args.num_features = 64
         # Updates
-        args.epochs_base = 600  # Base session epoch number, In paper 600
+        args.epochs_base = 1  # Base session epoch number, In paper 600
         args.batch_size = 256  # High-capacity fits with A100 GPU, In paper 256
         args.inc_learning_rate = 0.0005  # In the paper
     elif args.dataset == 'ucf101':
