@@ -301,7 +301,7 @@ class MICSTrainer:
             output, re_label = model.forward_mix_up(args, data, label)
 
             if re_label.shape[1] > softmax(output).shape[1]:
-                retarget = re_label[:, :softmax(output).shape[1]]
+                re_label = re_label[:, :softmax(output).shape[1]]
             elif re_label.shape[1] < softmax(output).shape[1]:
                 output = output[:, :re_label.shape[1]]
 
@@ -326,6 +326,7 @@ class MICSTrainer:
 
             updated_param_dict = deepcopy(model.state_dict())  # parameters after update
             model.load_state_dict(self.best_model_dict)
+
             for k, v in dict(model.named_parameters()).items():
                 if v.requires_grad:
                     for idx in P_st_idx[k]:
