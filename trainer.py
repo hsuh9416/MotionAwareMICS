@@ -414,6 +414,9 @@ class MICSTrainer:
 
         self.model.mode = self.args.new_mode  # avg_cos
 
+        # Optimizer settings - Performance enhancement: Momentum and Nesterov acceleration
+        optimizer, scheduler = self.get_optimizer_new()
+
         for session in range(1, self.args.sessions):
             # Init
             best_acc = 0.0
@@ -429,15 +432,10 @@ class MICSTrainer:
             self.model = self.average_embedding_inc(train_loader, np.unique(train_set.targets))  # Embedding
             train_loader.dataset.transform = train_transform  # Restore the transform
 
-            # Update the model parameters
-            self.model, P_st_idx = self.update_param(self.model, self.best_model_dict)
-
-            # Optimizer settings - Performance enhancement: Momentum and Nesterov acceleration
-            optimizer, scheduler = self.get_optimizer_new()
-
             # Incremental MICS training
             for epoch in range(self.args.inc_epochs):
-
+                # Update the model parameters
+                self.model, P_st_idx = self.update_param(self.model, self.best_model_dict)
                 train_acc, train_loss = self.inc_train(self.model, train_loader, optimizer,
                                                        self.args.inc_learning_rate, epoch, self.args,
                                                        P_st_idx, session)
