@@ -363,6 +363,7 @@ class MICSTrainer:
 
         for epoch in range(self.args.epochs_base):
             train_acc, train_loss = self.base_train(train_loader, base_optimizer, base_scheduler, epoch)
+            print(train_acc, train_loss)
             base_scheduler.step()
 
             self.results["train_acc"][0].append(train_acc)
