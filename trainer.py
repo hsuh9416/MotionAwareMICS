@@ -56,8 +56,8 @@ class MICSTrainer:
         self.model = model
         self.results = self.set_acc_table()  # Init the accuracy table
         self.save_path = self.args.model_dir  # Save the model here
-        self.pre_trained = False
-        self.best_model_dict = self.model.state_dict()  # Init the best model dict by initial state dict
+        self.pre_trained = args.checkpoint if args.dataset == 'cifar100' else None  # Pre-trained wheight for cifar10
+        self.best_model_dict = self.set_up_model()  # load pretrained if it existed
 
     def set_acc_table(self):
         """ Set the accuracy table of the model """
@@ -79,17 +79,15 @@ class MICSTrainer:
         return results
 
     def set_up_model(self):
-        """ Try load pre_trained model, if not, use initial model."""
-        if self.args.model_dir != None: # Load pre-trained model
-            self.pre_trained = True
+        """ Try load pre_trained model, if not, uses the initial model."""
+        if self.pre_trained and os.path.isfile(self.pre_trained):
             print('Loading init parameters from: %s' % self.args.model_dir)
-            self.best_model_dict = dict()
-
+            best_model_dict = dict()
             try:
-                temp_model_dict = torch.load(self.args.model_dir)['params']
+                temp_model_dict = torch.load(self.pre_trained)['params']
                 for key, value in temp_model_dict.items():
                     if 'dummy' not in key:
-                        self.best_model_dict[key] = value
+                        best_model_dict[key] = value
             except:
                 temp_model_dict = torch.load(self.args.model_dir)['state_dict']
                 for key, value in temp_model_dict.items():
@@ -97,8 +95,12 @@ class MICSTrainer:
                         temp_key = 'module.encoder' + key.split('backbone')[1]
                         if 'shortcut' in temp_key:
                             temp_key = temp_key.replace('shortcut', 'downsample')
-                        self.best_model_dict[temp_key] = value
-            self.best_model_dict['module.fc.weight'] = self.model.module.fc.weight
+                        best_model_dict[temp_key] = value
+            best_model_dict['module.fc.weight'] = self.model.module.fc.weight
+            return best_model_dict
+        else:
+            print("Manually trains base model...")
+            return self.model.state_dict()  # Init the best model dict by initial state dict
 
     def average_embedding(self, trainset, transform):
         """ replace fc.weight with the embedding average of train data """
@@ -143,7 +145,7 @@ class MICSTrainer:
         proto_list = []
         for class_index in range(self.args.base_class):
             data_index = (
-                        label_list == class_index).nonzero()  # nonzero: returns all non-zero elements' indices of the input tensor.
+                    label_list == class_index).nonzero()  # nonzero: returns all non-zero elements' indices of the input tensor.
             embedding_this = embedding_list[
                 data_index.squeeze(-1)]  # [N, 1] -> [N] then embedding for each data point by index
             embedding_mean = embedding_this.mean(0)  # Averaging
@@ -342,7 +344,7 @@ class MICSTrainer:
 
             lrc = scheduler.get_last_lr()[0]
             tqdm_gen.set_description('Session {}, epoch {}, lrc={:.4f},total loss={:.4f} acc={:.4f}'
-                                     .format(session, epoch+1, lrc, loss.item(), acc))
+                                     .format(session, epoch + 1, lrc, loss.item(), acc))
 
             tot_acc.add(acc)
             tot_loss.add(loss.item())
@@ -371,61 +373,62 @@ class MICSTrainer:
         best_loss = 0.0
         self.model.load_state_dict(self.best_model_dict)
 
-        ### 1. Base session training ###
         # Get dataloader
         train_set, train_loader, test_loader = get_dataloader(self.args, 0)
 
-        # Optimizer settings - Performance enhancement: Momentum and Nesterov acceleration
-        base_optimizer = torch.optim.SGD([
-            {'params': self.model.encoder.parameters(), 'lr': self.args.learning_rate},  # Encoder
-            {'params': self.model.fc.parameters(), 'lr': self.args.learning_rate}],  # Fully connected layer
-            lr=self.args.learning_rate,
-            momentum=0.9,  # Speed up the slope and suppress the sedation
-            nesterov=True,  # Move in the corrected direction, move in the momentum direction
-            weight_decay=0.0005)  # L2 regularization
+        if not self.pre_trained:  # Manual training
+            ### 1. Base session training ###
 
-        # Scheduler settings - Adjusting learning rate: CosineAnnealingLR method
-        base_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            base_optimizer,
-            T_max=self.args.epochs_base,
-            eta_min=0.0)
+            # Optimizer settings - Performance enhancement: Momentum and Nesterov acceleration
+            base_optimizer = torch.optim.SGD([
+                {'params': self.model.encoder.parameters(), 'lr': self.args.learning_rate},  # Encoder
+                {'params': self.model.fc.parameters(), 'lr': self.args.learning_rate}],  # Fully connected layer
+                lr=self.args.learning_rate,
+                momentum=0.9,  # Speed up the slope and suppress the sedation
+                nesterov=True,  # Move in the corrected direction, move in the momentum direction
+                weight_decay=0.0005)  # L2 regularization
 
-        for epoch in range(self.args.epochs_base):
-            train_acc, train_loss = self.base_train(train_loader, base_optimizer, base_scheduler, epoch)
-            print(f'[Train - Base Session: Epoch {epoch}] Accuracy = {round(train_acc, 2)}, Loss = {round(train_loss, 2)}')
-            base_scheduler.step()
+            # Scheduler settings - Adjusting learning rate: CosineAnnealingLR method
+            base_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                base_optimizer,
+                T_max=self.args.epochs_base,
+                eta_min=0.0)
 
-            self.results["train_acc"][0].append(train_acc)
-            self.results["train_loss"][0].append(train_loss)
+            for epoch in range(self.args.epochs_base):
+                train_acc, train_loss = self.base_train(train_loader, base_optimizer, base_scheduler, epoch)
+                print(
+                    f'[Train - Base Session: Epoch {epoch}] Accuracy = {round(train_acc, 2)}, Loss = {round(train_loss, 2)}')
+                base_scheduler.step()
 
-            # Save the best model
-            if train_acc > best_acc:
-                best_acc = train_acc
-                best_loss = train_loss
-                save_model_dir = os.path.join(self.save_path, 'base_session_max_acc.pth')
-                torch.save(dict(params=self.model.state_dict()), save_model_dir)
-                self.best_model_dict = deepcopy(self.model.state_dict())
-                print("Model saved to {}".format(save_model_dir))
+                self.results["train_acc"][0].append(train_acc)
+                self.results["train_loss"][0].append(train_loss)
 
-        # Compute nVar
-        avg_nvar = compute_nVar(self.model, train_loader, self.args.base_class)
-        self.results['train_nVAR'][0] = avg_nvar
+                # Save the best model
+                if train_acc > best_acc:
+                    best_acc = train_acc
+                    best_loss = train_loss
+                    save_model_dir = os.path.join(self.save_path, 'base_session_max_acc.pth')
+                    torch.save(dict(params=self.model.state_dict()), save_model_dir)
+                    self.best_model_dict = deepcopy(self.model.state_dict())
+                    print("Model saved to {}".format(save_model_dir))
 
-        print(
-            f'[Train - Base session: Final] Accuracy = {round(best_acc, 2)}, Loss = {round(best_loss, 2)}, nVAR = {round(avg_nvar, 2)}')
+            # Compute nVar
+            avg_nvar = compute_nVar(self.model, train_loader, self.args.base_class)
+            self.results['train_nVAR'][0] = avg_nvar
+
+            print(
+                f'[Train - Base session: Final] Accuracy = {round(best_acc, 2)}, Loss = {round(best_loss, 2)}, nVAR = {round(avg_nvar, 2)}')
 
         # Apply prototype classification to the trained model
         self.model = self.average_embedding(train_set, test_loader.dataset.transform)
 
         # Evaluation by test
-
         test_acc, test_loss, test_nvar = self.test(self.model, test_loader, self.args, 0)
         self.results['test_nVAR'][0] = test_nvar
         print(
             f'[Test - Base session] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}, nVAR = {round(test_nvar, 2)}')
 
         ### 2. Incremental session training ###
-
         self.model.mode = self.args.new_mode  # avg_cos
 
         # Optimizer settings - Performance enhancement: Momentum and Nesterov acceleration
@@ -453,7 +456,8 @@ class MICSTrainer:
                 train_acc, train_loss = self.inc_train(self.model, train_loader, optimizer,
                                                        scheduler, epoch, self.args,
                                                        P_st_idx, session)
-                print( f'[Train - Increment Session {session}: Epoch {epoch}] Accuracy = {round(train_acc, 2)}, Loss = {round(train_loss, 2)}')
+                print(
+                    f'[Train - Increment Session {session}: Epoch {epoch}] Accuracy = {round(train_acc, 2)}, Loss = {round(train_loss, 2)}')
 
                 self.results["train_acc"][session].append(train_acc)
                 self.results["train_loss"][session].append(train_loss)

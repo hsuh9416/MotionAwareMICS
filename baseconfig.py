@@ -2,6 +2,7 @@
 import torch
 import os
 
+
 # Common config class
 class BaseConfig:
     def __init__(self):
@@ -68,6 +69,8 @@ class BaseConfig:
         self.use_softlabel = True
         self.use_midpoint = True
 
+        # cifar100 pre-trained
+        self.checkpoint = os.path.join(self.model_dir, 'cifar100.pth')
 
         # Motion recognition settings
         self.use_motion = False  # Whether motion recognition function is enabled
