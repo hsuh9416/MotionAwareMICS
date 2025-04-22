@@ -96,7 +96,7 @@ class MICSTrainer:
                         if 'shortcut' in temp_key:
                             temp_key = temp_key.replace('shortcut', 'downsample')
                         best_model_dict[temp_key] = value
-            best_model_dict['module.fc.weight'] = self.model.module.fc.weight
+            best_model_dict['module.fc.weight'] = self.model.fc.weight
             return best_model_dict
         else:
             print("Manually trains base model...")
