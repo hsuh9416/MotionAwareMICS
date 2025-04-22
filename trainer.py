@@ -31,7 +31,8 @@ def mix_up_accuracy_counting(logits, label, topk=(1,)):
     acc = []
     for k in topk:
         correct_k = correct[:k].reshape(-1).float().sum(0)
-        acc.append(correct_k.mul_(100.0 / batch_size))
+        acc_value = correct_k.mul_(100.0 / batch_size).item()
+        acc.append(acc_value)
     return acc
 
 
@@ -363,8 +364,8 @@ class MICSTrainer:
             train_acc, train_loss = self.base_train(train_loader, base_optimizer, base_scheduler, epoch)
             base_scheduler.step()
 
-            self.results["train_acc"][0] = train_acc
-            self.results["train_loss"][0] = train_loss
+            self.results["train_acc"][0].append(train_acc)
+            self.results["train_loss"][0].append(train_loss)
 
             # Save the best model
             if train_acc > best_acc or (train_acc == best_acc and train_loss < best_loss):
@@ -376,17 +377,17 @@ class MICSTrainer:
 
         # Compute nVar
         avg_nvar = compute_nVar(self.model, train_loader, self.args.base_class)
-        self.results['train_nVAR'][0](avg_nvar)
+        self.results['train_nVAR'][0] = avg_nvar
 
         print(
-            f'[Train - Base session] Accuracy = {round(best_loss, 2)}, Loss = {round(best_loss, 2)}, nVAR = {round(avg_nvar, 2)}')
+            f'[Train - Base session] Accuracy = {round(best_acc, 2)}, Loss = {round(best_loss, 2)}, nVAR = {round(avg_nvar, 2)}')
 
         # Apply prototype classification to the trained model
         self.model = self.average_embedding(train_set, test_loader.dataset.transform)
 
         # Evaluation by test
         test_acc, test_loss, test_nvar = self.test(self.model, test_loader, self.args, 0)
-        self.results['test_nVAR'][0](test_nvar)
+        self.results['test_nVAR'][0] = test_nvar
         print(
             f'[Test - Base session] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}, nVAR = {round(test_nvar, 2)}')
 
@@ -442,9 +443,9 @@ class MICSTrainer:
         save_model_dir = os.path.join(self.save_path, f'final_acc.pth')
         torch.save(dict(params=self.model.state_dict()), save_model_dir)
 
-        print('\n*************** Final results ***************')
-        print(self.results['max_acc'], '\n')
-        self.print_table()
+        # print('\n*************** Final results ***************')
+        # print(self.results['max_acc'], '\n')
+        # self.print_table()
 
     def test(self, model, test_loader, args, session):
         """ Test session training """
