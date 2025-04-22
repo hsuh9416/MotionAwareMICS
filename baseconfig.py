@@ -1,6 +1,6 @@
 # Import necessary libraries
 import torch
-
+import os
 
 # Common config class
 class BaseConfig:
@@ -11,6 +11,9 @@ class BaseConfig:
         self.project = 'mics'
         self.dataset = 'cifar100'  # or 'ucf101'
         self.dataroot = '/content/drive/MyDrive/MotionAwareMICS/data/'  # Colab
+        if not os.path.exists(self.dataroot):
+            os.makedirs(self.dataroot, exist_ok=True)
+
         self.gpu = 0
         self.num_workers = 8
         self.seed = 1
@@ -35,7 +38,9 @@ class BaseConfig:
         self.base_mode = 'ft_cos'  # Cosine classifier
         self.new_mode = 'avg_cos'  # Average data embedding / Cosine classifier
         # self.start_session = 0
-        self.model_dir = '/content/drive/MyDrive/MotionAwareMICS/results/model/'
+        self.model_dir = '/content/drive/MyDrive/MotionAwareMICS/models/'
+        if not os.path.exists(self.model_dir):
+            os.makedirs(self.model_dir, exist_ok=True)
 
         # MICS settings - based on Table 4 (Section 4.5) of the paper
         self.st_ratio = 0.01  # session trainable parameter ratio

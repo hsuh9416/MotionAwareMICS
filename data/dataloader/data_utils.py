@@ -19,6 +19,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+import os
 
 # This function is based on the code from https://github.com/solangii/MICS
 # with modifications to adapt it to the Motion-Aware MICS implementation
@@ -102,7 +103,7 @@ def get_base_dataloader(args):
 def get_new_dataloader(args, session):
     if args.dataset == 'cifar100':
         txt_path = "index_list/" + args.dataset + "/session_" + str(session + 1) + '.txt'
-        class_index = open(txt_path).read().splitlines()
+        class_index = open(os.path.join(args.dataroot, txt_path)).read().splitlines()
         trainset = args.Dataset.CIFAR100(root=args.dataroot, train=True, download=False,
                                          index=class_index, base_sess=False)
     elif args.dataset == 'ucf101':
