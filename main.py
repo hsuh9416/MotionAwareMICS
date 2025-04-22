@@ -68,26 +68,26 @@ def main():
     plain_results = run_process(config)
 
     # # Motion-aware MICS (HMDB51)
-    # print("\n" + "=" * 50)
-    # print("Running Motion-Aware MICS algorithm...")
-    # print("=" * 50)
-    #
-    # # Reconfigure for motion-aware MICS
-    # config.use_motion = True
-    # config.flow_alpha = 0.5  # Optical flow weighting factor
-    # config.dataset = 'hmdb51'
-    # config = set_up_datasets(config)  # Setup Arguments
-    #
-    # # Run Motion-Aware MICS algorithm
-    # motion_results = run_process(config)
-    #
-    # # Visualize and compare results
-    # visualize_acc(plain_results['acc'], motion_results['acc'], config)
-    # visualize_nVar(plain_results['train_nVAR'], motion_results['train_nVAR'], config)
-    #
-    # # Save detailed comparison
-    # print("Performance Summary:")
-    # print(
-    #     f"Plain MICS - Final Accuracy: {plain_results['acc'][-1]:.2f}%, PD: {plain_results['acc'][0] - plain_results['acc'][-1]:.2f}%")
-    # print(
-    #     f"Motion-Aware MICS - Final Accuracy: {motion_results['acc'][-1]:.2f}%, PD: {motion_results['acc'][0] - motion_results['acc'][-1]:.2f}%")
+    print("\n" + "=" * 50)
+    print("Running Motion-Aware MICS algorithm...")
+    print("=" * 50)
+
+    # Reconfigure for motion-aware MICS
+    config.use_motion = True
+    config.flow_alpha = 0.5  # Optical flow weighting factor
+    config.dataset = 'hmdb51'
+    config = set_up_datasets(config)  # Setup Arguments
+
+    # Run Motion-Aware MICS algorithm
+    motion_results = run_process(config)
+
+    # Visualize and compare results
+    visualize_acc(plain_results['acc'], motion_results['acc'], config)
+    visualize_nVar(plain_results['train_nVAR'], motion_results['train_nVAR'], config)
+
+    # Save detailed comparison
+    print("Performance Summary:")
+    print(
+        f"Plain MICS - Final Accuracy: {plain_results['acc'][-1]:.2f}%, PD: {plain_results['acc'][0] - plain_results['acc'][-1]:.2f}%")
+    print(
+        f"Motion-Aware MICS - Final Accuracy: {motion_results['acc'][-1]:.2f}%, PD: {motion_results['acc'][0] - motion_results['acc'][-1]:.2f}%")
