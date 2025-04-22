@@ -132,6 +132,7 @@ def visualize_nVar(nVar_plain, nVar_motion, config):
     plt.ylabel('Normalized Variance (nVAR)')
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.legend()
+
     plt.savefig( os.path.join(save_dir, 'nvar_comparison.png'), dpi = 300)
     plt.close()
 
