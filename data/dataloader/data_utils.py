@@ -43,7 +43,7 @@ def set_up_datasets(args):
         args.epochs_base = 600  # Base session epoch number, In paper 600
         args.batch_size = 256  # High-capacity fits with A100 GPU, In paper 256
         args.inc_learning_rate = 0.0005  # In the paper
-    else: # hmdb51
+    elif args.dataset == 'hmdb51':
         args.base_class = 31  # Base classes for hmdb51
         args.num_classes = 51
         args.way = 5  # Number of new classes per session
@@ -55,6 +55,8 @@ def set_up_datasets(args):
         args.step_between_clips = 8  # Step size between clips
         args.fold = 1  # Which fold to use (1, 2, or 3)
         # Updates
+        args.epochs_base = 100  # Base session epoch number
+        args.batch_size = 16  # Videos require more memory
         args.inc_learning_rate = 0.0005  # In the paper
     return args
 
@@ -77,15 +79,15 @@ def get_base_dataloader(args):
                                         index=class_index, base_sess=True)
     elif args.dataset == 'hmdb51':
         trainset = args.Dataset.HMDB51(root=args.dataroot, train=True, download=True,
-                                              index=class_index, base_sess=True,
-                                              frames_per_clip=args.frames_per_clip,
-                                              step_between_clips=args.step_between_clips,
-                                              fold=args.fold)
+                                       index=class_index, base_sess=True,
+                                       frames_per_clip=args.frames_per_clip,
+                                       step_between_clips=args.step_between_clips,
+                                       fold=args.fold)
         testset = args.Dataset.HMDB51(root=args.dataroot, train=False, download=False,
-                                             index=class_index, base_sess=True,
-                                             frames_per_clip=args.frames_per_clip,
-                                             step_between_clips=args.step_between_clips,
-                                             fold=args.fold)
+                                      index=class_index, base_sess=True,
+                                      frames_per_clip=args.frames_per_clip,
+                                      step_between_clips=args.step_between_clips,
+                                      fold=args.fold)
 
     trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=args.batch_size, shuffle=True,
                                               num_workers=args.num_workers, pin_memory=True,
@@ -109,10 +111,10 @@ def get_new_dataloader(args, session):
         class_index = np.arange(start_idx, end_idx)
 
         trainset = args.Dataset.HMDB51(root=args.dataroot, train=True, download=False,
-                                              index=class_index, base_sess=False,
-                                              frames_per_clip=args.frames_per_clip,
-                                              step_between_clips=args.step_between_clips,
-                                              fold=args.fold)
+                                       index=class_index, base_sess=False,
+                                       frames_per_clip=args.frames_per_clip,
+                                       step_between_clips=args.step_between_clips,
+                                       fold=args.fold)
 
     batch_size_new = trainset.__len__()
     trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=batch_size_new, shuffle=False,
@@ -124,12 +126,12 @@ def get_new_dataloader(args, session):
     if args.dataset == 'cifar100':
         testset = args.Dataset.CIFAR100(root=args.dataroot, train=False, download=False,
                                         index=class_new, base_sess=False)
-    elif args.dataset == 'ucf101':
+    elif args.dataset == 'hmdb51':
         testset = args.Dataset.HMDB51(root=args.dataroot, train=False, download=False,
-                                             index=class_new, base_sess=False,
-                                             frames_per_clip=args.frames_per_clip,
-                                             step_between_clips=args.step_between_clips,
-                                             fold=args.fold)
+                                      index=class_new, base_sess=False,
+                                      frames_per_clip=args.frames_per_clip,
+                                      step_between_clips=args.step_between_clips,
+                                      fold=args.fold)
 
     testloader = torch.utils.data.DataLoader(dataset=testset, batch_size=args.batch_size, shuffle=False,
                                              num_workers=args.num_workers, pin_memory=True)
