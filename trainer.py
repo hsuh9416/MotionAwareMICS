@@ -188,7 +188,7 @@ class MICSTrainer:
         for k in remove_list:
             param_dict.pop(k)
 
-        # Pre-procession parameter data
+        # Pre-processing parameter data
         param_flatten_dict = {}
         param_len_dict = {}
         for k, v in param_dict.items():
@@ -206,6 +206,8 @@ class MICSTrainer:
         for k, v in param_len_dict.items():
             param_flattened_idx_list = [w_idx - count for w_idx in sel_weight_idx
                                         if (w_idx >= count) & (w_idx < count + v)]
+
+            # Multi-dimension indices
             param_idx_dict[k] = [np.unravel_index(flattened_idx, param_dict[k].shape)
                                  for flattened_idx in param_flattened_idx_list]
             count += v
@@ -214,13 +216,25 @@ class MICSTrainer:
 
     def update_param(self, model, pretrained_dict):
         model_dict = model.state_dict()
-        pretrained_dict = {k: v for k, v in pretrained_dict.items()}
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+
+        original_state = deepcopy(model_dict) # Copy the original state
+
+        # Update
         model_dict.update(pretrained_dict)
         model.load_state_dict(model_dict)
 
         if self.args.st_ratio < 1:
+            # Get the index of the session-trainable parameter
             P_st_idx = self.get_session_trainable_param_idx(model)
+
+            # Restore the selected parameter from the original state
+            for k, v in dict(model.named_parameters()).items():
+                if v.requires_grad and k in P_st_idx and len(P_st_idx[k]) > 0:
+                    for idx in P_st_idx[k]:
+                        orig_value = original_state[k].data[idx]
+                        v.data[idx] = orig_value
+
             return model, P_st_idx
         else:
             return model, None
@@ -399,25 +413,36 @@ class MICSTrainer:
         ### 2. Incremental session training ###
 
         self.model.mode = self.args.new_mode  # avg_cos
-        optimizer, scheduler = self.get_optimizer_new()
+
         for session in range(1, self.args.sessions):
+            # Init
+            best_acc = 0.0
+            best_loss = 0.0
 
             # Get dataloader
             train_set, train_loader, test_loader = get_dataloader(self.args, session)
 
             train_transform = deepcopy(train_loader.dataset.transform)  # Copy the transform
+
             # Replace the transform in the linked data loader with the transform used in the test set
             train_loader.dataset.transform = test_loader.dataset.transform
             self.model = self.average_embedding_inc(train_loader, np.unique(train_set.targets))  # Embedding
             train_loader.dataset.transform = train_transform  # Restore the transform
 
+            # Update the model parameters
+            self.model, P_st_idx = self.update_param(self.model, self.best_model_dict)
+
+            # Optimizer settings - Performance enhancement: Momentum and Nesterov acceleration
+            optimizer, scheduler = self.get_optimizer_new()
+
             # Incremental MICS training
             for epoch in range(self.args.inc_epochs):
-                self.model, P_st_idx = self.update_param(self.model, self.best_model_dict)
+
                 train_acc, train_loss = self.inc_train(self.model, train_loader, optimizer,
                                                        self.args.inc_learning_rate, epoch, self.args,
                                                        P_st_idx, session)
                 print( f'[Train - Increment Session {session}: Epoch {epoch}] Accuracy = {round(train_acc, 2)}, Loss = {round(train_loss, 2)}')
+
                 self.results["train_acc"][session].append(train_acc)
                 self.results["train_loss"][session].append(train_loss)
 
