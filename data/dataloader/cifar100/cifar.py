@@ -2,7 +2,7 @@ from PIL import Image
 import os
 import os.path
 import numpy as np
-
+import pickle
 import torchvision.transforms as transforms
 
 from torchvision.datasets.vision import VisionDataset
