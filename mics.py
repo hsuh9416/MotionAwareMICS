@@ -9,9 +9,9 @@ from resnet import resnet18, resnet20
 
 
 class MICS(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args, mode=None):
         super().__init__()
-        self.mode = 'ft_cos'
+        self.mode = mode
         self.args = args
 
         # Feature Extractor
@@ -26,7 +26,6 @@ class MICS(nn.Module):
         self.pre_allocate = self.args.num_classes
         self.fc = nn.Linear(self.args.num_features, self.pre_allocate, bias=False)
         nn.init.orthogonal_(self.fc.weight)
-
 
     def encode(self, x):
         """ Encoding: x(Tensor): [B, C, H, W] -> [B, C', H', W'] -> [B, C', 1, 1] -> [B, C']"""

@@ -385,7 +385,6 @@ class MICSTrainer:
                 self.best_model_dict = deepcopy(self.model.state_dict())
 
         # Compute nVar
-        print("Over here?")
         avg_nvar = compute_nVar(self.model, train_loader, self.args.base_class)
         self.results['train_nVAR'][0] = avg_nvar
 
@@ -396,6 +395,7 @@ class MICSTrainer:
         self.model = self.average_embedding(train_set, test_loader.dataset.transform)
 
         # Evaluation by test
+
         test_acc, test_loss, test_nvar = self.test(self.model, test_loader, self.args, 0)
         self.results['test_nVAR'][0] = test_nvar
         print(

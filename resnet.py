@@ -197,7 +197,7 @@ class ResNet20(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x, labels=None, mixup_alpha=0.5, num_base_classes=-1, gamma=0.5):
+    def forward(self, x, labels=None, mix_type="vanilla", mixup_alpha=0.5, num_base_classes=-1, gamma=0.5):
         """ forward function for ResNet-20 with Maniford mix-up."""
         # Initialize mix_label_mask
         mix_label_mask = None
@@ -210,14 +210,18 @@ class ResNet20(nn.Module):
             https://medium.com/@mandalsouvik/manifold-mixup-learning-better-representations-by-interpolating-hidden-states-8a2c949d5b5b
         """
         # Pick the layer to conduct mix-up
-        layer_mix = random.randint(0, 2)  # 0: Input, 1: First layer, 2: Second layer
+        if "mixup_hidden" in mix_type:
+            layer_mix = random.randint(0, 2) # 0: Input, 1: First layer, 2: Second layer
+        else:
+            layer_mix = None
 
         # Compute lambda = beta distribution with mixup_alpha
         lamb = np.random.beta(mixup_alpha, mixup_alpha) if mixup_alpha > 0 else 1
         lamb = torch.from_numpy(np.array([lamb]).astype('float32')).cuda()
 
         # Re-weighting labels for mix-up
-        new_labels = to_one_hot(labels, self.num_classes)
+        if labels is not None:
+            new_labels = to_one_hot(labels, self.num_classes)
 
         # Layer mix after Input
         if layer_mix == 0:

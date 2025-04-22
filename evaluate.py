@@ -15,7 +15,6 @@ def compute_nVar(model, dataloader, num_classes):
 
     # feature vector by class
     features_by_class = {i: [] for i in range(num_classes)}
-
     with torch.no_grad():
         for i, batch in enumerate(dataloader):
             data, label = [_.cuda() for _ in batch]
