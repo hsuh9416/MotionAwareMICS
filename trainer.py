@@ -175,7 +175,7 @@ class MICSTrainer:
         optimizer = torch.optim.SGD([{'params': self.model.encoder.parameters(), 'lr': inc_ir},
                                      {'params': self.model.fc.parameters(), 'lr': inc_ir}],
                                     momentum=self.args.momentum, nesterov=True, weight_decay=self.args.weight_decay)
-        scheduler = None  # No scheduler
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args.epochs_new)
         return optimizer, scheduler
 
     def get_session_trainable_param_idx(self, model):
@@ -289,7 +289,7 @@ class MICSTrainer:
 
         return tot_acc.val(), tot_loss.val()
 
-    def inc_train(self, model, train_loader, optimizer, lrc, epoch, args, P_st_idx=None, session=None):
+    def inc_train(self, model, train_loader, optimizer, scheduler, epoch, args, P_st_idx=None, session=None):
         tot_acc = Averager()
         tot_loss = Averager()
         bce_loss = torch.nn.BCEWithLogitsLoss().cuda()
@@ -318,6 +318,7 @@ class MICSTrainer:
             # Compute accuracy
             acc += mix_up_accuracy_counting(output, label)[0] / 100.0
 
+            lrc = scheduler.get_last_lr()[0]
             tqdm_gen.set_description('Session {}, epoch {}, lrc={:.4f},total loss={:.4f} acc={:.4f}'
                                      .format(session, epoch+1, lrc, loss.item(), acc))
 
@@ -428,7 +429,7 @@ class MICSTrainer:
                 # Update the model parameters
                 self.model, P_st_idx = self.update_param(self.model, self.best_model_dict)
                 train_acc, train_loss = self.inc_train(self.model, train_loader, optimizer,
-                                                       self.args.inc_learning_rate, epoch, self.args,
+                                                       scheduler, epoch, self.args,
                                                        P_st_idx, session)
                 print( f'[Train - Increment Session {session}: Epoch {epoch}] Accuracy = {round(train_acc, 2)}, Loss = {round(train_loss, 2)}')
 
