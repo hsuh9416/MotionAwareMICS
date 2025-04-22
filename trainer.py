@@ -375,6 +375,7 @@ class MICSTrainer:
                 torch.save(dict(params=self.model.state_dict()), save_model_dir)
                 self.best_model_dict = deepcopy(self.model.state_dict())
                 print("Model saved to {}".format(save_model_dir))
+
         # Compute nVar
         avg_nvar = compute_nVar(self.model, train_loader, self.args.base_class)
         self.results['train_nVAR'][0] = avg_nvar
@@ -424,6 +425,7 @@ class MICSTrainer:
                     save_model_dir = os.path.join(self.save_path, f'inc_session_{session}_max_acc.pth')
                     torch.save(dict(params=self.model.state_dict()), save_model_dir)
                     self.best_model_dict = deepcopy(self.model.state_dict())
+                    print("Model saved to {}".format(save_model_dir))
 
             # Compute nVar
             cur_num_classes = self.args.base_class + session * self.args.way

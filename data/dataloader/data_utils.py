@@ -101,7 +101,7 @@ def get_base_dataloader(args):
 
 def get_new_dataloader(args, session):
     if args.dataset == 'cifar100':
-        txt_path = "data/index_list/" + args.dataset + "/session_" + str(session + 1) + '.txt'
+        txt_path = "index_list/" + args.dataset + "/session_" + str(session + 1) + '.txt'
         class_index = open(txt_path).read().splitlines()
         trainset = args.Dataset.CIFAR100(root=args.dataroot, train=True, download=False,
                                          index=class_index, base_sess=False)
