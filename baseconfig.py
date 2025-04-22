@@ -17,7 +17,7 @@ class BaseConfig:
         self.memo = ''
 
         # Training - Same as the paper
-        self.epochs_base = 100  # Base session epoch number, In paper 600
+        self.base_epochs = 100  # epochs_base - Base session epoch number, In paper 600
         self.inc_epochs = 10  # epochs_new - Incremental session epoch number
         self.epochs_new = 10  # In Paper
         self.learning_rate = 0.1  # lr_base - Initial learning rate
