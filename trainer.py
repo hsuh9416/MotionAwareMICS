@@ -360,7 +360,7 @@ class MICSTrainer:
             T_max=self.args.epochs_base,
             eta_min=0.0)
 
-        for epoch in range(self.args.base_epochs):
+        for epoch in range(self.args.epochs_base):
             train_acc, train_loss = self.base_train(train_loader, base_optimizer, base_scheduler, epoch)
             base_scheduler.step()
 
