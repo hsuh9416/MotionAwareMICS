@@ -372,7 +372,7 @@ class MICSTrainer:
         # 0. Global initialization
         best_acc = 0.0
         best_loss = 0.0
-        print(self.best_model_dict)
+
         self.model.load_state_dict(self.best_model_dict)
 
         # Get dataloader
@@ -399,7 +399,7 @@ class MICSTrainer:
             for epoch in range(self.args.epochs_base):
                 train_acc, train_loss = self.base_train(train_loader, base_optimizer, base_scheduler, epoch)
                 print(
-                    f'[Train - Base Session: Epoch {epoch}] Accuracy = {round(train_acc, 2)}, Loss = {round(train_loss, 2)}')
+                    f'[Train - Base Session: Epoch {epoch}] Accuracy = {round(train_acc, 4)}, Loss = {round(train_loss, 4)}')
                 base_scheduler.step()
 
                 self.results["train_acc"][0].append(train_acc)
@@ -419,7 +419,7 @@ class MICSTrainer:
             self.results['train_nVAR'][0] = avg_nvar
 
             print(
-                f'[Train - Base session: Final] Accuracy = {round(best_acc, 2)}, Loss = {round(best_loss, 2)}, nVAR = {round(avg_nvar, 2)}')
+                f'[Train - Base session: Final] Accuracy = {round(best_acc, 4)}, Loss = {round(best_loss, 4)}, nVAR = {round(avg_nvar, 4)}')
 
         # Apply prototype classification to the trained model
         self.model = self.average_embedding(train_set, test_loader.dataset.transform)
@@ -428,7 +428,7 @@ class MICSTrainer:
         test_acc, test_loss, test_nvar = self.test(self.model, test_loader, self.args, 0)
         self.results['test_nVAR'][0] = test_nvar
         print(
-            f'[Test - Base session] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}, nVAR = {round(test_nvar, 2)}')
+            f'[Test - Base session] Accuracy = {round(test_acc, 4)}, Loss = {round(test_loss, 4)}, nVAR = {round(test_nvar, 4)}')
 
         ### 2. Incremental session training ###
         self.model.mode = self.args.new_mode  # avg_cos
@@ -459,7 +459,7 @@ class MICSTrainer:
                                                        scheduler, epoch, self.args,
                                                        P_st_idx, session)
                 print(
-                    f'[Train - Increment Session {session}: Epoch {epoch}] Accuracy = {round(train_acc, 2)}, Loss = {round(train_loss, 2)}')
+                    f'[Train - Increment Session {session}: Epoch {epoch}] Accuracy = {round(train_acc, 4)}, Loss = {round(train_loss, 4)}')
 
                 self.results["train_acc"][session].append(train_acc)
                 self.results["train_loss"][session].append(train_loss)
@@ -479,7 +479,7 @@ class MICSTrainer:
             self.results['train_nVAR'][session] = avg_nvar
 
             print(
-                f'[Train - Increment session {session}: Final] Accuracy = {round(best_acc, 2)}, Loss = {round(best_loss, 2)}, nVAR = {round(avg_nvar, 2)}')
+                f'[Train - Increment session {session}: Final] Accuracy = {round(best_acc, 4)}, Loss = {round(best_loss, 4)}, nVAR = {round(avg_nvar, 4)}')
 
             # Replace the transform in the linked data loader with the transform used in the test set.
             train_loader.dataset.transform = train_transform
@@ -489,7 +489,7 @@ class MICSTrainer:
             test_acc, test_loss, test_nvar = self.test(self.model, test_loader, self.args, session)
             self.results['test_nVAR'][session] = test_nvar
             print(
-                f'[Test - Increment session {session}] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}, nVAR = {round(test_nvar, 2)}')
+                f'[Test - Increment session {session}] Accuracy = {round(test_acc, 4)}, Loss = {round(test_loss, 4)}, nVAR = {round(test_nvar, 4)}')
 
         # Save the final model
         save_model_dir = os.path.join(self.save_path, f'final_acc.pth')
