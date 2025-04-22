@@ -24,7 +24,7 @@ class MICS(nn.Module):
 
         # Init classifier
         self.pre_allocate = self.args.num_classes
-        self.fc = nn.Linear(self.num_features, self.pre_allocate, bias=False)
+        self.fc = nn.Linear(self.args.num_features, self.pre_allocate, bias=False)
         nn.init.orthogonal_(self.fc.weight)
 
 
