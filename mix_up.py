@@ -8,6 +8,7 @@ matplotlib.use('agg')
 
 def to_one_hot(labels, num_classes):
     """ Converts labels to one-hot vectors."""
+    labels = labels.cuda()
     one_hot = torch.zeros(labels.size(0), num_classes).cuda()
     one_hot.scatter_(1, labels.view(-1, 1), 1)
     return one_hot
