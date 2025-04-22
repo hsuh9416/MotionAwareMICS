@@ -212,27 +212,3 @@ class CIFAR100(CIFAR10):
         'key': 'fine_label_names',
         'md5': '7973b15100ade9c7d40fb424638fde48',
     }
-
-
-if __name__ == "__main__":
-    dataroot = '/home/miil/Datasets/FSCIL-CEC'
-    batch_size_base = 128
-    txt_path = "../../index_list/cifar100/session_2.txt"
-    # class_index = open(txt_path).read().splitlines()
-    class_index = np.arange(60)
-    class_index_val = np.arange(60, 76)
-    class_index_test = np.arange(76, 100)
-
-    trainset = CIFAR100(root=dataroot, train=True, download=True, transform=None, index=class_index_test,
-                        base_sess=True)
-    testset = CIFAR100(root=dataroot, train=False, download=False, index=class_index, base_sess=True)
-
-    import pickle
-
-    print(trainset.data.shape)
-    print(trainset.targets.shape)
-    cls = np.unique(trainset.targets)
-    print(cls)
-    data = {'data': trainset.data, 'labels': trainset.targets}
-    with open('CIFAR100_test.pickle', 'wb') as handle:
-        pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
