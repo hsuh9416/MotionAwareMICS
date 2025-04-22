@@ -413,8 +413,8 @@ class MICSTrainer:
                                                        self.args.inc_learning_rate, epoch, self.args,
                                                        P_st_idx)
 
-                self.results["train_acc"][session] = train_acc
-                self.results["train_loss"][session] = train_loss
+                self.results["train_acc"][session].append(train_acc)
+                self.results["train_loss"][session].append(train_loss)
 
                 # Save the best model
                 if train_acc > best_acc or (train_acc == best_acc and train_loss < best_loss):
@@ -430,12 +430,12 @@ class MICSTrainer:
             self.results['train_nVAR'][session] = avg_nvar
 
             # Replace the transform in the linked data loader with the transform used in the test set.
-            train_loader.dataset.transform = train_loader.dataset.transform
+            train_loader.dataset.transform = train_transform
             self.model = self.average_embedding_inc(train_loader, np.unique(train_set.targets))  # Embedding
 
             # Evaluation by test
             test_acc, test_loss, test_nvar = self.test(self.model, test_loader, self.args, session)
-            self.results['test_nVAR'][session](test_nvar)
+            self.results['test_nVAR'][session] = test_nvar
             print(
                 f'[Test - Increment session {session}] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}, nVAR = {round(test_nvar, 2)}')
 
