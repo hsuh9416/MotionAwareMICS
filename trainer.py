@@ -363,7 +363,7 @@ class MICSTrainer:
 
         for epoch in range(self.args.epochs_base):
             train_acc, train_loss = self.base_train(train_loader, base_optimizer, base_scheduler, epoch)
-            print(train_acc, train_loss)
+            print(f'[Train - Base Session: Epoch {epoch}] Accuracy = {round(train_acc, 2)}, Loss = {round(train_loss, 2)}')
             base_scheduler.step()
 
             self.results["train_acc"][0].append(train_acc)
@@ -383,7 +383,7 @@ class MICSTrainer:
         self.results['train_nVAR'][0] = avg_nvar
 
         print(
-            f'[Train - Base session] Accuracy = {round(best_acc, 2)}, Loss = {round(best_loss, 2)}, nVAR = {round(avg_nvar, 2)}')
+            f'[Train - Base session: Final] Accuracy = {round(best_acc, 2)}, Loss = {round(best_loss, 2)}, nVAR = {round(avg_nvar, 2)}')
 
         # Apply prototype classification to the trained model
         self.model = self.average_embedding(train_set, test_loader.dataset.transform)
@@ -416,7 +416,7 @@ class MICSTrainer:
                 train_acc, train_loss = self.inc_train(self.model, train_loader, optimizer,
                                                        self.args.inc_learning_rate, epoch, self.args,
                                                        P_st_idx, session)
-
+                print( f'[Train - Increment Session {session}: Epoch {epoch}] Accuracy = {round(train_acc, 2)}, Loss = {round(train_loss, 2)}')
                 self.results["train_acc"][session].append(train_acc)
                 self.results["train_loss"][session].append(train_loss)
 
@@ -435,7 +435,7 @@ class MICSTrainer:
             self.results['train_nVAR'][session] = avg_nvar
 
             print(
-                f'[Train - Increment session {session}] Accuracy = {round(best_acc, 2)}, Loss = {round(best_loss, 2)}, nVAR = {round(avg_nvar, 2)}')
+                f'[Train - Increment session {session}: Final] Accuracy = {round(best_acc, 2)}, Loss = {round(best_loss, 2)}, nVAR = {round(avg_nvar, 2)}')
 
             # Replace the transform in the linked data loader with the transform used in the test set.
             train_loader.dataset.transform = train_transform
