@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import cv2
 
 from resnet import resnet18, resnet20
-
+from mix_up import to_one_hot, middle_label_mix_process
 
 class MICS(nn.Module):
     def __init__(self, args, mode=None):
@@ -116,7 +116,7 @@ class MICS(nn.Module):
 # Motion-aware mixup implementation
 class MotionAwareMixup(nn.Module):
     def __init__(self, args):
-        super(MotionAwareMixup, self).__init__()
+        super().__init__()
         self.args = args
         self.flow_alpha = args.flow_alpha
 
@@ -171,41 +171,93 @@ class MotionAwareMixup(nn.Module):
         return mixed_frames, adjusted_lam
 
 
+    def forward_mix_up_motion(self, args, x, labels=None):
+        """Forward propagation with Motion-Aware Mix-Up for video data"""
+        cur_num_class = int(max(labels)) + 1
+
+        # Motion-aware processing for video data
+        if len(x.shape) == 5:  # [B, C, T, H, W] - Video data
+            # Initialize motion-aware mixup module
+            motion_mixup = MotionAwareMixup(args)
+
+            # Compute lambda = beta distribution with mixup_alpha
+            lamb = np.random.beta(args.alpha, args.alpha) if args.alpha > 0 else 1
+            lam_tensor = torch.from_numpy(np.array([lamb]).astype('float32')).cuda()
+
+            # Get batch indices for mixing
+            indices = np.random.permutation(x.size(0))
+
+            # Create one-hot labels
+            target_reweighted = to_one_hot(labels, self.num_classes)
+
+            # Apply motion-aware mixup
+            x_mixed, adjusted_lam = motion_mixup(x, x[indices], lam_tensor)
+
+            # Extract features
+            x_mixed = self.encoder(x_mixed)
+
+            # Create midpoint labels and virtual classifiers
+            retarget, mix_label_mask = middle_label_mix_process(
+                target_reweighted, target_reweighted[indices],
+                cur_num_class, adjusted_lam, args.gamma
+            )
+
+            # Calculate middle classifier
+            classifier = self.calculate_middle_classifier(mix_label_mask)
+
+            # Compute logits
+            x_mixed = F.adaptive_avg_pool2d(x_mixed, 1)
+            x_mixed = x_mixed.squeeze(-1).squeeze(-1)
+            x_mixed = F.linear(F.normalize(x_mixed, p=2, dim=-1), F.normalize(classifier, p=2, dim=-1))
+
+            # Apply temperature scaling
+            output = args.temperature * x_mixed
+
+            return output, retarget
+        else:
+            # Fall back to standard mixup for image data
+            return self.forward_mix_up(args, x, labels)
+
 # Optical flow computation function
 def compute_optical_flow(frames):
-    """Compute optical flow between consecutive frames"""
+    """
+    Compute optical flow between consecutive frames
+    Args:
+        frames: tensor of shape [B, C, T, H, W]
+    Returns:
+        flows: tensor of shape [B, 2, T-1, H, W]
+    """
     B, C, T, H, W = frames.shape
     flows = torch.zeros(B, 2, T - 1, H, W, device=frames.device)
 
     # Process each batch and time step
     for b in range(B):
+        prev_frame = None
+
         for t in range(T - 1):
-            try:
-                # Convert to NumPy for OpenCV
+            # Convert current frames to numpy for OpenCV
+            if prev_frame is None:
                 prev_frame = frames[b, :, t].permute(1, 2, 0).detach().cpu().numpy()
-                next_frame = frames[b, :, t + 1].permute(1, 2, 0).detach().cpu().numpy()
-
-                # Ensure valid range for OpenCV
-                prev_frame = np.clip(prev_frame, 0, 1)
-                next_frame = np.clip(next_frame, 0, 1)
-
-                # Convert to uint8 format
                 prev_frame = (prev_frame * 255).astype(np.uint8)
-                next_frame = (next_frame * 255).astype(np.uint8)
-
-                # Convert to grayscale
                 prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_RGB2GRAY)
-                next_gray = cv2.cvtColor(next_frame, cv2.COLOR_RGB2GRAY)
 
-                # Compute flow
-                flow = cv2.calcOpticalFlowFarneback(prev_gray, next_gray, flow=None, pyr_scale=0.5, levels=3,
-                                                    winsize=15, iterations=3, poly_n=5, poly_sigma=1.2, flags=0)
+            curr_frame = frames[b, :, t + 1].permute(1, 2, 0).detach().cpu().numpy()
+            curr_frame = (curr_frame * 255).astype(np.uint8)
+            curr_gray = cv2.cvtColor(curr_frame, cv2.COLOR_RGB2GRAY)
 
-                # Store flow
-                flows[b, 0, t] = torch.from_numpy(flow[:, :, 0]).cuda()
-                flows[b, 1, t] = torch.from_numpy(flow[:, :, 1]).cuda()
+            # Calculate optical flow using Farneback method
+            flow = cv2.calcOpticalFlowFarneback(
+                prev_gray, curr_gray, None,
+                pyr_scale=0.5, levels=3, winsize=15,
+                iterations=3, poly_n=5, poly_sigma=1.2, flags=0
+            )
 
-            except Exception as e:
-                print(f"Error computing optical flow: {e}")
+            # Store flow in tensor
+            flows[b, 0, t] = torch.from_numpy(flow[:, :, 0]).to(frames.device)
+            flows[b, 1, t] = torch.from_numpy(flow[:, :, 1]).to(frames.device)
+
+            # Update previous frame
+            prev_frame = curr_frame
+            prev_gray = curr_gray
 
     return flows

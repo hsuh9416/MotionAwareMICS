@@ -1,4 +1,5 @@
 # Import necessary libraries
+import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -63,7 +64,7 @@ def compute_nVar(model, dataloader, num_classes):
 
 
 # PCA visualization function (Per session)
-def visualize_pca(model, test_loaders, current_classes, config, session_idx):
+def visualize_pca(model, test_loaders, current_classes, session_idx):
     model.eval()
     all_features = []
     all_labels = []
@@ -129,89 +130,91 @@ def visualize_nVar(nVar_plain, nVar_motion, config):
     plt.savefig('/content/drive/MyDrive/MotionAwareMICS/results/nvar_comparison.png', dpi=300)
 
 
-# Accuracy/Loss visualization function (X: epochs, Y: nVAR)
-def visualize_acc(history_plain, history_motion, config):
-    # Visualize accuracy by session
+def visualize_performance_comparison(plain_results, motion_results, config):
+    """Create comprehensive comparison visualizations of MICS vs Motion-Aware MICS"""
+    # Directory for saving results
+    save_dir = os.path.join(config.save_path, 'visualizations')
+    os.makedirs(save_dir, exist_ok=True)
+
+    # Extract performance metrics
+    plain_acc = plain_results['acc']
+    motion_acc = motion_results['acc']
+
+    plain_nvar = plain_results['train_nVAR']
+    motion_nvar = motion_results['train_nVAR']
+
+    # Session ranges
+    sessions = list(range(config.sessions))
+
+    # 1. Accuracy comparison
     plt.figure(figsize=(12, 8))
+    plt.plot(sessions, plain_acc, marker='o', linestyle='-', linewidth=2, label='Plain MICS')
+    plt.plot(sessions, motion_acc, marker='s', linestyle='-', linewidth=2, label='Motion-Aware MICS')
 
-    # Dataset and session information
-    sessions = list(range(config.num_sessions + 1))
+    # Compute PD
+    plain_pd = plain_acc[0] - plain_acc[-1]
+    motion_pd = motion_acc[0] - motion_acc[-1]
 
-    # Plain MICS
-    plt.plot(sessions, history_plain, marker='o', linestyle='-',
-             linewidth=2, markersize=8, label='Plain MICS')
+    # Annotate PD values
+    plt.annotate(f'PD: {plain_pd:.2f}%',
+                 xy=(sessions[-1], plain_acc[-1]),
+                 xytext=(sessions[-1] - 1, plain_acc[-1] - 5),
+                 arrowprops=dict(arrowstyle='->'))
 
-    # Motion-Aware MICS
-    plt.plot(sessions, history_motion, marker='s', linestyle='-',
-             linewidth=2, markersize=8, label='Motion-Aware MICS')
+    plt.annotate(f'PD: {motion_pd:.2f}%',
+                 xy=(sessions[-1], motion_acc[-1]),
+                 xytext=(sessions[-1] - 1, motion_acc[-1] + 5),
+                 arrowprops=dict(arrowstyle='->'))
 
-    # Graph setting
-    plt.title('Session-wise Accuracy Comparison', fontsize=18)
+    plt.title('Performance Comparison: MICS vs Motion-Aware MICS', fontsize=16)
     plt.xlabel('Session', fontsize=14)
     plt.ylabel('Accuracy (%)', fontsize=14)
     plt.grid(True, linestyle='--', alpha=0.7)
-    plt.xticks(sessions)
+    plt.legend(loc='best', fontsize=12)
+    plt.savefig(os.path.join(save_dir, 'accuracy_comparison.png'), dpi=300)
 
-    # Compute performance degradation
-    pd_plain = history_plain[0] - history_plain[-1]
-    pd_motion = history_motion[0] - history_motion[-1]
+    # 2. nVAR comparison (compactness and separability)
+    plt.figure(figsize=(12, 8))
+    plt.plot(sessions, plain_nvar, marker='o', linestyle='-', linewidth=2, label='Plain MICS nVAR')
+    plt.plot(sessions, motion_nvar, marker='s', linestyle='-', linewidth=2, label='Motion-Aware MICS nVAR')
+    plt.title('Feature Compactness and Separability Comparison', fontsize=16)
+    plt.xlabel('Session', fontsize=14)
+    plt.ylabel('Normalized Variance (nVAR)', fontsize=14)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.legend(loc='best', fontsize=12)
+    plt.savefig(os.path.join(save_dir, 'nvar_comparison.png'), dpi=300)
 
-    # Annotation
-    plt.annotate(f'PD: {pd_plain:.2f}%',
-                 xy=(sessions[-1], history_plain[-1]),
-                 xytext=(sessions[-1] - 1, history_plain[-1] - 5),
-                 arrowprops=dict(arrowstyle='->'))
-
-    plt.annotate(f'PD: {pd_motion:.2f}%',
-                 xy=(sessions[-1], history_motion[-1]),
-                 xytext=(sessions[-1] - 1, history_motion[-1] + 5),
-                 arrowprops=dict(arrowstyle='->'))
-
-    plt.legend(loc='upper right', fontsize=12)
-    plt.tight_layout()
-
-    # Save results
-    plt.savefig('results/mics_comparison_results.png', dpi=300)
-
-    # Performance degradation rate comparison graph
-    plt.figure(figsize=(8, 6))
-
+    # 3. Bar chart for final performance
+    plt.figure(figsize=(10, 6))
     methods = ['Plain MICS', 'Motion-Aware MICS']
-    pd_values = [pd_plain, pd_motion]
+    final_acc = [plain_acc[-1], motion_acc[-1]]
+    pd_values = [plain_pd, motion_pd]
 
-    # Create a bar graph
-    bars = plt.bar(methods, pd_values, color=['#3498db', '#e74c3c'])
+    x = np.arange(len(methods))
+    width = 0.35
 
-    # Show value above bar
-    for bar, val in zip(bars, pd_values):
-        plt.text(bar.get_x() + bar.get_width() / 2, val + 0.5, f'{val:.2f}%',
-                 ha='center', va='bottom', fontsize=12)
+    fig, ax = plt.subplots(figsize=(12, 8))
+    ax.bar(x - width / 2, final_acc, width, label='Final Accuracy')
+    ax.bar(x + width / 2, pd_values, width, label='Performance Degradation')
 
-    plt.title('Performance Dropping Rate Comparison', fontsize=16)
-    plt.ylabel('Performance Dropping Rate (%)', fontsize=12)
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
-    plt.tight_layout()
+    ax.set_ylabel('Percentage (%)', fontsize=14)
+    ax.set_title('Final Performance Metrics', fontsize=16)
+    ax.set_xticks(x)
+    ax.set_xticklabels(methods)
+    ax.legend()
 
-    # Save results
-    plt.savefig('/content/drive/MyDrive/MotionAwareMICS/results/performance_dropping_rate.png', dpi=300)
+    plt.savefig(os.path.join(save_dir, 'final_performance_comparison.png'), dpi=300)
 
-    # Compare final accuracy
-    plt.figure(figsize=(8, 6))
-
-    final_acc = [history_plain[-1], history_motion[-1]]
-
-    # Create a bar graph
-    bars = plt.bar(methods, final_acc, color=['#3498db', '#e74c3c'])
-
-    # Show value above bar
-    for bar, val in zip(bars, final_acc):
-        plt.text(bar.get_x() + bar.get_width() / 2, val + 0.5, f'{val:.2f}%',
-                 ha='center', va='bottom', fontsize=12)
-
-    plt.title('Final Session Accuracy Comparison', fontsize=16)
-    plt.ylabel('Accuracy (%)', fontsize=12)
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
-    plt.tight_layout()
-
-    # Save results
-    plt.savefig('/content/drive/MyDrive/MotionAwareMICS/results/final_accuracy_comparison.png', dpi=300)
+    # Return statistics summary
+    return {
+        'plain': {
+            'final_acc': plain_acc[-1],
+            'pd': plain_pd,
+            'avg_nvar': np.mean(plain_nvar)
+        },
+        'motion': {
+            'final_acc': motion_acc[-1],
+            'pd': motion_pd,
+            'avg_nvar': np.mean(motion_nvar)
+        }
+    }
