@@ -12,23 +12,28 @@ from tqdm import tqdm
 from data.dataloader.data_utils import get_dataloader
 from evaluate import compute_nVar
 
+
 def accuracy_counting(logits, label):
     """ Accuracy by counting """
     pred = torch.argmax(logits, dim=1)
     return (pred == label).type(torch.cuda.FloatTensor).mean().item()
 
-def mix_up_accuracy_counting(logits, label):
+
+def mix_up_accuracy_counting(logits, label, topk=(1,)):
     """ Accuracy by counting for the mix-up method """
+    maxk = max(topk)
     batch_size = label.size(0)
 
-    _, pred = logits.topk(1, 1, True, True)
-    pred = pred.squeeze() # [batch_size, 1] -> [batch_size]
+    _, pred = logits.topk(maxk, 1, True, True)
+    pred = pred.t()
+    correct = pred.eq(label.view(1, -1).expand_as(pred))
 
-    # Compute accuracy
-    correct = pred.eq(label)
-    accuracy = correct.float().sum(0) * 100.0 / batch_size
+    acc = []
+    for k in topk:
+        correct_k = correct[:k].reshape(-1).float().sum(0)
+        acc.append(correct_k.mul_(100.0 / batch_size))
+    return acc
 
-    return accuracy
 
 # Dynamically average the values
 class Averager:
@@ -43,15 +48,16 @@ class Averager:
     def val(self):
         return self.v
 
+
 class MICSTrainer:
     def __init__(self, model, args):
         super().__init__()
         self.args = args
         self.model = model
-        self.results = self.set_acc_table() # Init the accuracy table
-        self.save_path = self.set_save_path() # Save the model
+        self.results = self.set_acc_table()  # Init the accuracy table
+        self.save_path = self.set_save_path()  # Save the model
 
-        self.best_model_dict = self.model.state_dict() # Init the best model dict by initial state dict
+        self.best_model_dict = self.model.state_dict()  # Init the best model dict by initial state dict
 
     def set_acc_table(self):
         """ Set the accuracy table of the model """
@@ -75,7 +81,7 @@ class MICSTrainer:
     def set_save_path(self):
         """ Set the save path of the model """
         time_str = datetime.datetime.now().strftime('%m%d%Y')
-        save_path = '%s/%s' % (self.args.dataset, time_str) # e.g.ucf101/04202025
+        save_path = '%s/%s' % (self.args.dataset, time_str)  # e.g.ucf101/04202025
         save_path = os.path.join('results', save_path)  # e.g.results/ucf101/04202025
         os.makedirs(save_path, exist_ok=True)
 
@@ -83,12 +89,12 @@ class MICSTrainer:
 
     def average_embedding(self, trainset, transform):
         """ replace fc.weight with the embedding average of train data """
-        model = self.model.eval() # Evaluation mode
+        model = self.model.eval()  # Evaluation mode
         current_mode = model.mode
 
         # Dataloader without augmentation
         train_loader = torch.utils.data.DataLoader(dataset=trainset, batch_size=128,
-                                                  num_workers=8, pin_memory=True, shuffle=False)
+                                                   num_workers=8, pin_memory=True, shuffle=False)
 
         # Replace the transform in the linked data loader with the transform used in the test set.
         train_loader.dataset.transform = transform
@@ -97,11 +103,11 @@ class MICSTrainer:
         label_list = []
 
         # Embedding
-        with torch.no_grad(): # pure forwarding without gradient
+        with torch.no_grad():  # pure forwarding without gradient
             for i, batch in enumerate(train_loader):
                 data, label = [_.cuda() for _ in batch]
-                model.mode = 'encoder' # Encoder mode
-                embedding = model(data) # Feature extraction
+                model.mode = 'encoder'  # Encoder mode
+                embedding = model(data)  # Feature extraction
 
                 embedding_list.append(embedding.cpu())
                 label_list.append(label.cpu())
@@ -123,13 +129,15 @@ class MICSTrainer:
         # Calculate prototypes by class
         proto_list = []
         for class_index in range(self.args.base_class):
-            data_index = (label_list == class_index).nonzero() # nonzero: returns all non-zero elements' indices of the input tensor.
-            embedding_this = embedding_list[data_index.squeeze(-1)] # [N, 1] -> [N] then embedding for each data point by index
-            embedding_mean = embedding_this.mean(0) # Averaging
+            data_index = (label_list == class_index).nonzero()  # nonzero: returns all non-zero elements' indices of the input tensor.
+            embedding_this = embedding_list[
+                data_index.squeeze(-1)]  # [N, 1] -> [N] then embedding for each data point by index
+            embedding_mean = embedding_this.mean(0)  # Averaging
             proto_list.append(embedding_mean)
 
         # Update classifier weights by prototypes
-        model.fc.weight.data[:self.args.base_class] = torch.stack(proto_list, dim=0) # Convert(stack) to a single torch.tensor
+        model.fc.weight.data[:self.args.base_class] = torch.stack(proto_list,
+                                                                  dim=0)  # Convert(stack) to a single torch.tensor
 
         # Recover the mode of the model
         model.mode = current_mode
@@ -148,9 +156,10 @@ class MICSTrainer:
         # Update prototype weights
         new_fc = []
         for class_index in class_list:
-            data_index = (label == class_index).nonzero() # nonzero: returns all non-zero elements' indices of the input tensor.
-            embedding = data[data_index.squeeze(-1)] # [N, 1] -> [N] then embedding for each data point by index
-            proto = embedding.mean(0) # Averaging
+            data_index = (
+                        label == class_index).nonzero()  # nonzero: returns all non-zero elements' indices of the input tensor.
+            embedding = data[data_index.squeeze(-1)]  # [N, 1] -> [N] then embedding for each data point by index
+            proto = embedding.mean(0)  # Averaging
             new_fc.append(proto)
             model.fc.weight.data[class_index] = proto
 
@@ -159,7 +168,7 @@ class MICSTrainer:
     def get_logits(self, x, fc):
         """A function that calculates the raw score (logit) to be used as a classification result."""
         # Cosine similarity computation
-        x = F.linear(F.normalize(x, p=2, dim=1), F.normalize(fc, p=2,dim=1))
+        x = F.linear(F.normalize(x, p=2, dim=1), F.normalize(fc, p=2, dim=1))
 
         # Temperature scaling is a hyperparameter applied to the softmax function and is used to adjust the output distribution of the model.
         # The lower the temperature, the higher the confidence of the classification.
@@ -169,10 +178,12 @@ class MICSTrainer:
         return x
 
     def get_optimizer_new(self):
-        optimizer = torch.optim.SGD([{'params': self.model.encoder.parameters(), 'lr': self.args.learning_rate},
-                                     {'params': self.model.fc.parameters(), 'lr': 0}],
-                                    momentum=0.9, nesterov=True, weight_decay=0.0005)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=self.args.step, gamma=self.args.gamma)
+        inc_ir = self.args.inc_learning_rate
+
+        optimizer = torch.optim.SGD([{'params': self.model.encoder.parameters(), 'lr': inc_ir},
+                                     {'params': self.model.fc.parameters(), 'lr': inc_ir}],
+                                    momentum=self.args.momentum, nesterov=True, weight_decay=self.args.weight_decay)
+        scheduler = None  # No scheduler
         return optimizer, scheduler
 
     def get_session_trainable_param_idx(self, model):
@@ -225,12 +236,12 @@ class MICSTrainer:
     def base_train(self, train_loader, optimizer, scheduler, epoch):
         """ Base session training """
         # Init objects to compute average loss and accuracy
-        avg_loss = Averager()
-        avg_acc = Averager()
+        tot_loss = Averager()
+        tot_acc = Averager()
 
         # Init BCE loss function
-        bce_loss = nn.BCELoss().cuda() # BCE function
-        softmax = nn.Softmax(dim=1).cuda() # Activation function
+        bce_loss = nn.BCELoss().cuda()  # BCE function
+        softmax = nn.Softmax(dim=1).cuda()  # Activation function
 
         # Set training mode
         model = self.model.train()
@@ -241,7 +252,7 @@ class MICSTrainer:
         # For each epoch
         for i, batch in enumerate(tqdm_gen, 1):
             # Init
-            num_loss, loss, acc = 0, 0., 0
+            loss, acc = 0., 0
 
             # Midpoint
             data, label = [_.cuda() for _ in batch]
@@ -257,7 +268,7 @@ class MICSTrainer:
             loss += bce_loss(softmax(output), re_label)
 
             # Compute accuracy
-            acc += mix_up_accuracy_counting(output, label) / 100.0 # percentage
+            acc += mix_up_accuracy_counting(output, label)[0] / 100.0  # percentage
 
             # Current learning rate
             cur_lr = scheduler.get_last_lr()[0]
@@ -269,19 +280,19 @@ class MICSTrainer:
             )
 
             # Update average loss and accuracy
-            avg_loss.add(loss.item())
-            avg_acc.add(acc)
+            tot_loss.add(loss.item())
+            tot_acc.add(acc)
 
             # Backward propagation and parameter update
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-        return avg_acc.val(), avg_loss.val()
+        return tot_acc.val(), tot_loss.val()
 
-    def inc_train(self, model, train_loader, optimizer, scheduler, epoch, args, P_st_idx=None):
-        tl = Averager()
-        ta = Averager()
+    def inc_train(self, model, train_loader, optimizer, lrc, epoch, args, P_st_idx=None):
+        tot_acc = Averager()
+        tot_loss = Averager()
         bce_loss = torch.nn.BCELoss().cuda()
         softmax = torch.nn.Softmax(dim=1).cuda()
 
@@ -289,7 +300,7 @@ class MICSTrainer:
         tqdm_gen = tqdm(train_loader)
 
         for i, batch in enumerate(tqdm_gen, 1):
-            num_loss, loss, acc = 0, 0., 0.
+            loss, acc = 0., 0.
             data, label = [_.cuda() for _ in batch]
 
             output, retarget = model.forward_mix_up(args, data, label)
@@ -301,16 +312,15 @@ class MICSTrainer:
             loss += bce_loss(softmax(output), retarget)
             acc += mix_up_accuracy_counting(output, label)[0] * 0.01
 
-            lrc = scheduler.get_last_lr()[0]
             tqdm_gen.set_description('Session 0, epo {}, lrc={:.4f},total loss={:.4f} acc={:.4f}'
                                      .format(epoch, lrc, loss.item(), acc))
-            tl.add(loss.item())
-            ta.add(acc)
+
+            tot_acc.add(acc)
+            tot_loss.add(loss.item())
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-
 
             updated_param_dict = deepcopy(model.state_dict())  # parameters after update
             model.load_state_dict(self.best_model_dict)
@@ -319,9 +329,9 @@ class MICSTrainer:
                     for idx in P_st_idx[k]:
                         v.data[idx] = updated_param_dict[k].data[idx]
 
-        tl = tl.val()
-        ta = ta.val()
-        return tl, ta
+        tot_acc = tot_acc.val()
+        tot_loss = tot_loss.val()
+        return tot_acc, tot_loss
 
     def train(self):
         """ Comprehensive training function """
@@ -336,14 +346,18 @@ class MICSTrainer:
 
         # Optimizer settings - Performance enhancement: Momentum and Nesterov acceleration
         base_optimizer = torch.optim.SGD([
-            {'params': self.model.encoder.parameters(), 'lr': self.args.learning_rate}, # Encoder
-            {'params': self.model.fc.parameters(), 'lr': self.args.learning_rate}], # Fully connected layer
-            momentum=0.9, # Speed up the slope and suppress the sedation
-            nesterov=True, # Move in the corrected direction, move in the momentum direction
-            weight_decay=0.0005) # L2 regularization
+            {'params': self.model.encoder.parameters(), 'lr': self.args.learning_rate},  # Encoder
+            {'params': self.model.fc.parameters(), 'lr': self.args.learning_rate}],  # Fully connected layer
+            lr=self.args.learning_rate,
+            momentum=0.9,  # Speed up the slope and suppress the sedation
+            nesterov=True,  # Move in the corrected direction, move in the momentum direction
+            weight_decay=0.0005)  # L2 regularization
 
-        # Scheduler settings - Adjusting learning rate: STEP method
-        base_scheduler = torch.optim.lr_scheduler.StepLR(base_optimizer, step_size=self.args.step_size, gamma=self.args.gamma)
+        # Scheduler settings - Adjusting learning rate: CosineAnnealingLR method
+        base_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            base_optimizer,
+            T_max=self.args.epochs_base,
+            eta_min=0.0)
 
         for epoch in range(self.args.base_epochs):
             train_acc, train_loss = self.base_train(train_loader, base_optimizer, base_scheduler, epoch)
@@ -364,40 +378,42 @@ class MICSTrainer:
         avg_nvar = compute_nVar(self.model, train_loader, self.args.base_class)
         self.results['train_nVAR'][0](avg_nvar)
 
-        print(f'[Train - Base session] Accuracy = {round(best_loss, 2)}, Loss = {round(best_loss, 2)}, nVAR = {round(avg_nvar, 2)}')
+        print(
+            f'[Train - Base session] Accuracy = {round(best_loss, 2)}, Loss = {round(best_loss, 2)}, nVAR = {round(avg_nvar, 2)}')
 
-        # Apply protype classification to the trained model
+        # Apply prototype classification to the trained model
         self.model = self.average_embedding(train_set, test_loader.dataset.transform)
 
         # Evaluation by test
         test_acc, test_loss, test_nvar = self.test(self.model, test_loader, self.args, 0)
         self.results['test_nVAR'][0](test_nvar)
-        print(f'[Test - Base session] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}, nVAR = {round(test_nvar, 2)}')
+        print(
+            f'[Test - Base session] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}, nVAR = {round(test_nvar, 2)}')
 
         ### 2. Incremental session training ###
 
-        self.model.mode = self.args.new_mode # avg_cos
+        self.model.mode = self.args.new_mode  # avg_cos
         optimizer, scheduler = self.get_optimizer_new()
         for session in range(1, self.args.sessions):
 
             # Get dataloader
             train_set, train_loader, test_loader = get_dataloader(self.args, session)
 
-            train_transform = deepcopy(train_loader.dataset.transform) # Copy the transform
+            train_transform = deepcopy(train_loader.dataset.transform)  # Copy the transform
             # Replace the transform in the linked data loader with the transform used in the test set
             train_loader.dataset.transform = test_loader.dataset.transform
             self.model = self.average_embedding_inc(train_loader, np.unique(train_set.targets))  # Embedding
-            train_loader.dataset.transform = train_transform # Restore the transform
+            train_loader.dataset.transform = train_transform  # Restore the transform
 
             # Incremental MICS training
             for epoch in range(self.args.inc_epochs):
                 self.model, P_st_idx = self.update_param(self.model, self.best_model_dict)
-                train_acc, train_loss = self.inc_train(self.model, train_loader, optimizer, scheduler, epoch, self.args, P_st_idx)
+                train_acc, train_loss = self.inc_train(self.model, train_loader, optimizer,
+                                                       self.args.inc_learning_rate, epoch, self.args,
+                                                       P_st_idx)
 
                 self.results["train_acc"][session] = train_acc
                 self.results["train_loss"][session] = train_loss
-
-
 
                 # Save the best model
                 if train_acc > best_acc or (train_acc == best_acc and train_loss < best_loss):
@@ -414,12 +430,13 @@ class MICSTrainer:
 
             # Replace the transform in the linked data loader with the transform used in the test set.
             train_loader.dataset.transform = train_loader.dataset.transform
-            self.model = self.average_embedding_inc(train_loader, np.unique(train_set.targets)) # Embedding
+            self.model = self.average_embedding_inc(train_loader, np.unique(train_set.targets))  # Embedding
 
             # Evaluation by test
             test_acc, test_loss, test_nvar = self.test(self.model, test_loader, self.args, session)
             self.results['test_nVAR'][session](test_nvar)
-            print(f'[Test - Increment session {session}] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}, nVAR = {round(test_nvar, 2)}')
+            print(
+                f'[Test - Increment session {session}] Accuracy = {round(test_acc, 2)}, Loss = {round(test_loss, 2)}, nVAR = {round(test_nvar, 2)}')
 
         # Save the final model
         save_model_dir = os.path.join(self.save_path, f'final_acc.pth')
@@ -433,8 +450,8 @@ class MICSTrainer:
         """ Test session training """
         test_class = args.base_class + session * args.way
 
-        model = model.eval() # Evaluation mode
-        avg_loss = Averager() # Init average loss
+        model = model.eval()  # Evaluation mode
+        tot_loss = Averager()  # Init average loss
 
         pred = []
         label = []
@@ -447,7 +464,7 @@ class MICSTrainer:
                 logits = logits[:, :test_class]
                 loss = F.cross_entropy(logits, test_label)
 
-                avg_loss.add(loss.item())
+                tot_loss.add(loss.item())
                 pred.extend(logits)
                 label.extend(test_label)
 
@@ -455,17 +472,15 @@ class MICSTrainer:
             pred = torch.stack(pred, 0)
             label = torch.stack(label, 0)
 
-            # Ex. CUB: args.base_class + (session - 1) * args.way = 100 + (N-1) * 10
             pred_base = pred[:, :args.base_class + (session - 1) * args.way]
             pred_novel = pred[:, args.base_class + (session - 1) * args.way:]
             label_novel = label - (args.base_class + (session - 1) * args.way)
 
-            # Ex. CUB: args.base_class = 100
             pred_old = pred[:, :args.base_class]
             pred_new = pred[:, args.base_class:]
             label_new = label - args.base_class
 
-            self.results['acc'][session] = accuracy_counting(pred, label) # Compute accuracy by counting
+            self.results['acc'][session] = accuracy_counting(pred, label)  # Compute accuracy by counting
 
             if session == 0:
                 top1_base = accuracy_counting(pred, label)
@@ -511,9 +526,8 @@ class MICSTrainer:
             # Compute nVAR
             cur_num_classes = args.base_class + session * args.way
             nvar = compute_nVar(model, test_loader, cur_num_classes)
-            nvar = compute_nVar(model, test_loader, cur_num_classes)
 
-        return self.results['acc'][session], avg_loss.val(), nvar
+        return self.results['acc'][session], tot_loss.val(), nvar
 
     def print_table(self):
         print("{:<13}{}".format("Pretraining:", self.args.base_mode.split('_')[-1]))
@@ -558,4 +572,3 @@ class MICSTrainer:
         print(str_acc_old2)
         print(str_acc_new2)
         print('\n')
-

@@ -10,22 +10,23 @@ from resnet import resnet18, resnet20
 
 class MICS(nn.Module):
     def __init__(self, args):
-        super(MICS, self).__init__()
+        super().__init__()
         self.mode = 'ft_cos'
         self.args = args
-        self.device = args.device  # Cuda
 
         # Feature Extractor
         if args.dataset == 'cifar100':
             self.encoder = resnet20(num_classes=args.num_classes)
-            self.num_features = 64
         else:  # Motion dataset 'ucf101'
             self.encoder = resnet18(num_classes=args.num_classes)
-            self.num_features = 512
+
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
         # Init classifier
-        self.fc = nn.Linear(self.num_features, args.num_classes, bias=False)
-        nn.init.zeros_(self.fc.weight)  # Init weights as zeros
+        self.pre_allocate = self.args.num_classes
+        self.fc = nn.Linear(self.num_features, self.pre_allocate, bias=False)
+        nn.init.orthogonal_(self.fc.weight)
+
 
     def encode(self, x):
         """ Encoding: x(Tensor): [B, C, H, W] -> [B, C', H', W'] -> [B, C', 1, 1] -> [B, C']"""

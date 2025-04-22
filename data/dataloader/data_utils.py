@@ -38,6 +38,9 @@ def set_up_datasets(args):
         args.sessions = 9  # base + 8 incremental sessions
         args.Dataset = CifarDataset
         args.num_features = 64
+        # Updates
+        args.epochs_base = 600  # Base session epoch number, In paper 600
+        args.batch_size = 256  # High-capacity fits with A100 GPU, In paper 256
         args.inc_learning_rate = 0.0005  # In the paper
     elif args.dataset == 'ucf101':
         args.base_class = 61  # Base classes for UCF101
@@ -50,6 +53,7 @@ def set_up_datasets(args):
         args.frames_per_clip = 16  # Number of frames per video clip
         args.step_between_clips = 8  # Step size between clips
         args.fold = 1  # Which fold to use (1, 2, or 3)
+        # Updates
         args.inc_learning_rate = 0.0005  # In the paper
     return args
 
