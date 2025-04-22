@@ -27,7 +27,7 @@ import os
 import numpy as np
 import torch
 import data.dataloader.cifar100.cifar as CifarDataset
-import data.dataloader.ucf101.ucf101 as UCF101Dataset
+import data.dataloader.hmdb51.hmdb as HMDB51Dataset
 
 
 def set_up_datasets(args):
@@ -43,13 +43,13 @@ def set_up_datasets(args):
         args.epochs_base = 10  # Base session epoch number, In paper 600
         args.batch_size = 256  # High-capacity fits with A100 GPU, In paper 256
         args.inc_learning_rate = 0.0005  # In the paper
-    elif args.dataset == 'ucf101':
-        args.base_class = 61  # Base classes for UCF101
-        args.num_classes = 101
+    else: # hmdb51
+        args.base_class = 31  # Base classes for hmdb51
+        args.num_classes = 51
         args.way = 5  # Number of new classes per session
         args.shot = 5  # Number of shots per class
-        args.sessions = 9  # base + 8 incremental sessions
-        args.Dataset = UCF101Dataset
+        args.sessions = 5  # base + 4 incremental sessions
+        args.Dataset = HMDB51Dataset
         args.num_features = 512
         args.frames_per_clip = 16  # Number of frames per video clip
         args.step_between_clips = 8  # Step size between clips
@@ -69,23 +69,19 @@ def get_dataloader(args, session):
 
 def get_base_dataloader(args):
     class_index = np.arange(args.base_class)
-    is_autoaug = "autoaug" in args.train if hasattr(args, 'train') else False
-
-    if hasattr(args, 'is_autoaug') and args.is_autoaug:
-        is_autoaug = True
 
     if args.dataset == 'cifar100':
         trainset = args.Dataset.CIFAR100(root=args.dataroot, train=True, download=True,
                                          index=class_index, base_sess=True)
         testset = args.Dataset.CIFAR100(root=args.dataroot, train=False, download=False,
                                         index=class_index, base_sess=True)
-    elif args.dataset == 'ucf101':
-        trainset = args.Dataset.UCF101Dataset(root=args.dataroot, train=True, download=True,
+    elif args.dataset == 'hmdb51':
+        trainset = args.Dataset.HMDB51(root=args.dataroot, train=True, download=True,
                                               index=class_index, base_sess=True,
                                               frames_per_clip=args.frames_per_clip,
                                               step_between_clips=args.step_between_clips,
                                               fold=args.fold)
-        testset = args.Dataset.UCF101Dataset(root=args.dataroot, train=False, download=False,
+        testset = args.Dataset.HMDB51(root=args.dataroot, train=False, download=False,
                                              index=class_index, base_sess=True,
                                              frames_per_clip=args.frames_per_clip,
                                              step_between_clips=args.step_between_clips,
@@ -106,13 +102,13 @@ def get_new_dataloader(args, session):
         class_index = open(os.path.join(args.dataroot, txt_path)).read().splitlines()
         trainset = args.Dataset.CIFAR100(root=args.dataroot, train=True, download=False,
                                          index=class_index, base_sess=False)
-    elif args.dataset == 'ucf101':
-        # For UCF101, we'll use numeric class indices for incremental sessions
+    elif args.dataset == 'hmdb51':
+        # For hmdb51, we'll use numeric class indices for incremental sessions
         start_idx = args.base_class + (session - 1) * args.way
         end_idx = args.base_class + session * args.way
         class_index = np.arange(start_idx, end_idx)
 
-        trainset = args.Dataset.UCF101Dataset(root=args.dataroot, train=True, download=False,
+        trainset = args.Dataset.HMDB51(root=args.dataroot, train=True, download=False,
                                               index=class_index, base_sess=False,
                                               frames_per_clip=args.frames_per_clip,
                                               step_between_clips=args.step_between_clips,
@@ -129,7 +125,7 @@ def get_new_dataloader(args, session):
         testset = args.Dataset.CIFAR100(root=args.dataroot, train=False, download=False,
                                         index=class_new, base_sess=False)
     elif args.dataset == 'ucf101':
-        testset = args.Dataset.UCF101Dataset(root=args.dataroot, train=False, download=False,
+        testset = args.Dataset.HMDB51(root=args.dataroot, train=False, download=False,
                                              index=class_new, base_sess=False,
                                              frames_per_clip=args.frames_per_clip,
                                              step_between_clips=args.step_between_clips,

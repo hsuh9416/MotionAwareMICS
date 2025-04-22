@@ -6,7 +6,6 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 from torchvision.datasets.vision import VisionDataset
-from t
 class UCF101Dataset(VisionDataset):
     """UCF101 Action Recognition Dataset adapted for Few-Shot Class-Incremental Learning.
 
