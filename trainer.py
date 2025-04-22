@@ -218,8 +218,6 @@ class MICSTrainer:
         model_dict = model.state_dict()
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
 
-        original_state = deepcopy(model_dict) # Copy the original state
-
         # Update
         model_dict.update(pretrained_dict)
         model.load_state_dict(model_dict)
@@ -227,14 +225,6 @@ class MICSTrainer:
         if self.args.st_ratio < 1:
             # Get the index of the session-trainable parameter
             P_st_idx = self.get_session_trainable_param_idx(model)
-
-            # Restore the selected parameter from the original state
-            for k, v in dict(model.named_parameters()).items():
-                if v.requires_grad and k in P_st_idx and len(P_st_idx[k]) > 0:
-                    for idx in P_st_idx[k]:
-                        orig_value = original_state[k].data[idx]
-                        v.data[idx] = orig_value
-
             return model, P_st_idx
         else:
             return model, None
@@ -341,10 +331,11 @@ class MICSTrainer:
             updated_param_dict = deepcopy(model.state_dict())  # parameters after update
             model.load_state_dict(self.best_model_dict)
 
-            for k, v in dict(model.named_parameters()).items():
-                if v.requires_grad:
-                    for idx in P_st_idx[k]:
-                        v.data[idx] = updated_param_dict[k].data[idx]
+            if self.args.st_ratio < 1:
+                for k, v in dict(model.named_parameters()).items():
+                    if v.requires_grad:
+                        for idx in P_st_idx[k]:
+                            v.data[idx] = updated_param_dict[k].data[idx]
 
         tot_acc = tot_acc.val()
         tot_loss = tot_loss.val()
