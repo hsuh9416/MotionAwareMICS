@@ -101,7 +101,7 @@ class ResNet18(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x, labels=None, mixup_alpha=0.5, num_base_classes=-1, gamma=0.2):
+    def forward(self, x, labels=None, mixup_alpha=0.5, num_base_classes=-1, gamma=0.5):
         """ forward function for ResNet-18 with Maniford mix-up."""
         # Initialize mix_label_mask
         mix_label_mask = None
@@ -193,7 +193,7 @@ class ResNet20(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x, labels=None, mixup_alpha=0.5, num_base_classes=-1, gamma=0.2):
+    def forward(self, x, labels=None, mixup_alpha=0.5, num_base_classes=-1, gamma=0.5):
         """ forward function for ResNet-20 with Maniford mix-up."""
         # Initialize mix_label_mask
         mix_label_mask = None

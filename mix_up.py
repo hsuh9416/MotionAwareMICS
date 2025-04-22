@@ -8,7 +8,6 @@ matplotlib.use('agg')
 
 def to_one_hot(labels, num_classes):
     """ Converts labels to one-hot vectors."""
-    labels = labels.cuda()
     one_hot = torch.zeros(labels.size(0), num_classes).cuda()
     one_hot.scatter_(1, labels.view(-1, 1), 1)
     return one_hot
@@ -62,7 +61,7 @@ def middle_label_mix_process(label1, label2, num_base_classes, lamb, gamma):
 
     return label, mix_label_mask
 
-def middle_mixup_process(out, labels, num_base_classes, lamb, gamma=0.2):
+def middle_mixup_process(out, labels, num_base_classes, lamb, gamma=0.5):
     indices = np.random.permutation(out.size(0))
     out = out * lamb + out[indices] * (1 - lamb)
     target_reweighted, mix_label_mask = middle_label_mix_process(labels, labels[indices], num_base_classes, lamb, gamma)
