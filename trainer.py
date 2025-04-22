@@ -17,24 +17,6 @@ def accuracy_counting(logits, label):
     pred = torch.argmax(logits, dim=1)
     return (pred == label).type(torch.cuda.FloatTensor).mean().item()
 
-
-def mix_up_accuracy_counting(logits, label, topk=(1,)):
-    """ Accuracy by counting for the mix-up method """
-    maxk = max(topk)
-    batch_size = label.size(0)
-
-    _, pred = logits.topk(maxk, 1, True, True)
-    pred = pred.t()
-    correct = pred.eq(label.view(1, -1).expand_as(pred))
-
-    acc = []
-    for k in topk:
-        correct_k = correct[:k].reshape(-1).float().sum(0)
-        acc_value = correct_k.mul_(100.0 / batch_size).item()
-        acc.append(acc_value)
-    return acc
-
-
 # Dynamically average the values
 class Averager:
     def __init__(self):
@@ -292,7 +274,7 @@ class MICSTrainer:
             # loss += bce_loss(softmax(output), re_label)
 
             # Compute accuracy
-            acc += mix_up_accuracy_counting(output, label)[0] / 100.0  # percentage
+            acc += accuracy_counting(output, label)  # percentage
 
             # Current learning rate
             cur_lr = scheduler.get_last_lr()[0]
@@ -341,7 +323,7 @@ class MICSTrainer:
             # loss += bce_loss(softmax(output), re_label)
 
             # Compute accuracy
-            acc += mix_up_accuracy_counting(output, label)[0] / 100.0
+            acc += accuracy_counting(output, label)
 
             lrc = scheduler.get_last_lr()[0]
             tqdm_gen.set_description('Session {}, epoch {}, lrc={:.4f},total loss={:.4f} acc={:.4f}'
@@ -458,8 +440,6 @@ class MICSTrainer:
                 train_acc, train_loss = self.inc_train(self.model, train_loader, optimizer,
                                                        scheduler, epoch, self.args,
                                                        P_st_idx, session)
-                print(
-                    f'[Train - Increment Session {session}: Epoch {epoch}] Accuracy = {round(train_acc, 4)}, Loss = {round(train_loss, 4)}')
 
                 self.results["train_acc"][session].append(train_acc)
                 self.results["train_loss"][session].append(train_loss)
