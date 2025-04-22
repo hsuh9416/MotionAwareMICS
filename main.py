@@ -69,18 +69,19 @@ def main():
     # TODO: Visualizations for comparison
     print(plain_results)
 
-    # Motion-aware MICS (UCF101)
-    print("\n" + "=" * 50)
-    print("Running Motion-Aware MICS algorithm...")
-    print("=" * 50)
-
-    # Reconfigure for motion-aware MICS
-    config.use_motion = True
-    config.dataset = 'ucf101'
-    config = set_up_datasets(config)  # Setup Arguments
-
-    # Run Extended MICS algorithm and save checkpoints
-    motion_results = run_process(config)
-
-    # TODO: Visualizations for comparison
-    print(motion_results)
+    # TODO: Apply Motion-aware MICS
+    # # Motion-aware MICS (UCF101)
+    # print("\n" + "=" * 50)
+    # print("Running Motion-Aware MICS algorithm...")
+    # print("=" * 50)
+    #
+    # # Reconfigure for motion-aware MICS
+    # config.use_motion = True
+    # config.dataset = 'ucf101'
+    # config = set_up_datasets(config)  # Setup Arguments
+    #
+    # # Run Extended MICS algorithm and save checkpoints
+    # motion_results = run_process(config)
+    #
+    # # TODO: Visualizations for comparison
+    # print(motion_results)
