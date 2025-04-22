@@ -64,7 +64,9 @@ def compute_nVar(model, dataloader, num_classes):
 
 
 # PCA visualization function (Per session)
-def visualize_pca(model, test_loaders, current_classes, session_idx):
+def visualize_pca(model, test_loaders, current_classes, session_idx, config):
+    # Directory for saving results
+    save_dir = config.save_path
     model.eval()
     all_features = []
     all_labels = []
@@ -111,12 +113,15 @@ def visualize_pca(model, test_loaders, current_classes, session_idx):
     plt.ylabel('PC2')
     plt.legend(loc='upper right', bbox_to_anchor=(1.3, 1), ncol=2)
     plt.tight_layout()
-    plt.savefig(f'/content/drive/MyDrive/MotionAwareMICS/results/pca_session_{session_idx}.png', dpi=300)
+
+    plt.savefig( os.path.join(save_dir, f'pca_session_{session_idx}.png'), dpi = 300)
     plt.close()
 
 
 # nVAR visualization function (X: session index, Y: nVAR)
 def visualize_nVar(nVar_plain, nVar_motion, config):
+    # Directory for saving results
+    save_dir = config.save_path
     sessions = list(range(config.num_sessions + 1))
 
     plt.figure(figsize=(10, 6))
@@ -127,13 +132,13 @@ def visualize_nVar(nVar_plain, nVar_motion, config):
     plt.ylabel('Normalized Variance (nVAR)')
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.legend()
-    plt.savefig('/content/drive/MyDrive/MotionAwareMICS/results/nvar_comparison.png', dpi=300)
-
+    plt.savefig( os.path.join(save_dir, 'nvar_comparison.png'), dpi = 300)
+    plt.close()
 
 def visualize_performance_comparison(plain_results, motion_results, config):
     """Create comprehensive comparison visualizations of MICS vs Motion-Aware MICS"""
     # Directory for saving results
-    save_dir = os.path.join(config.save_path, 'visualizations')
+    save_dir = config.save_path
     os.makedirs(save_dir, exist_ok=True)
 
     # Extract performance metrics
