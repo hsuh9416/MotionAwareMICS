@@ -1,13 +1,13 @@
 import hashlib
-import os
-import re
 import random
+import re
 import shutil
 import tempfile
 from urllib.parse import urlparse
 from urllib.request import urlopen
 
 import torch.nn as nn
+
 from mix_up import *
 
 

@@ -8,6 +8,7 @@ import torch
 # Import user-defined modules
 from baseconfig import BaseConfig
 from data.dataloader.data_utils import set_up_datasets
+from evaluate import visualize_acc, visualize_pca, visualize_nVar
 from mics import MICS  # MICS model with motion-aware features
 from trainer import MICSTrainer
 
@@ -66,8 +67,7 @@ def main():
     # Run MICS algorithm and save checkpoints
     plain_results = run_process(config)
 
-    # TODO: Visualizations for comparison
-    print(plain_results)
+    # TODO: Visualizations for comparison (evaluate.py 연결)
 
     # TODO: Apply Motion-aware MICS
     # # Motion-aware MICS (UCF101)
@@ -83,5 +83,4 @@ def main():
     # # Run Extended MICS algorithm and save checkpoints
     # motion_results = run_process(config)
     #
-    # # TODO: Visualizations for comparison
-    # print(motion_results)
+    # # TODO: Visualizations for comparison (evaluate.py 연결)

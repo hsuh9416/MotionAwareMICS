@@ -2,7 +2,7 @@ import tensorflow_datasets as tdfs
 
 from torchvision.datasets.vision import VisionDataset
 from torchvision.datasets.utils import check_integrity, download_and_extract_archive
-
+# TODO cifar.py와 동일한 양식으로 수정하기
 class HMDB51(VisionDataset):
     """HMDB51 Dataset."""
     def __init__(self, root, train=True, transform=None, target_transform=None):
