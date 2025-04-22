@@ -2,9 +2,11 @@ import numpy as np
 import torch
 import matplotlib
 import os
+
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 matplotlib.use('agg')
+
 
 def to_one_hot(labels, num_classes):
     """ Converts labels to one-hot vectors."""
@@ -12,6 +14,7 @@ def to_one_hot(labels, num_classes):
     one_hot = torch.zeros(labels.size(0), num_classes).cuda()
     one_hot.scatter_(1, labels.view(-1, 1), 1)
     return one_hot
+
 
 def get_middle_label(label1, label2, num_base_classes):
     label1 = np.argmax(label1.cpu().numpy(), axis=1)
@@ -40,6 +43,7 @@ def get_middle_label(label1, label2, num_base_classes):
 
     return mix_label_mask, to_one_hot(torch.tensor(middle_label), len(mix_label_hash))
 
+
 def middle_label_mix_process(label1, label2, num_base_classes, lamb, gamma):
     mix_label_mask, label3 = get_middle_label(label1, label2, num_base_classes)
     if label3.size(1) > label1.size(1):
@@ -50,10 +54,10 @@ def middle_label_mix_process(label1, label2, num_base_classes, lamb, gamma):
     # Paper 4.1 Construction of Mix-up Samples: soft labeling process - Formula (3)
     lamb = lamb.item() if torch.is_tensor(lamb) else lamb
     gamma = gamma.item() if torch.is_tensor(gamma) else gamma
-    slope = 1 / (1 - gamma) # 1 / (1 - gamma)
-    y1 = np.maximum((1 - lamb - gamma) * slope, 0) # y1 = max((1 - lambda - gamma)/(1 - gamma), 0)
-    y2 = np.maximum((lamb - gamma) * slope, 0) # y2 = max((lambda - gamma)/(1 - gamma), 0)
-    y3 = (1 - y1 - y2) # y3 = 1- y1 - y2
+    slope = 1 / (1 - gamma)  # 1 / (1 - gamma)
+    y1 = np.maximum((1 - lamb - gamma) * slope, 0)  # y1 = max((1 - lambda - gamma)/(1 - gamma), 0)
+    y2 = np.maximum((lamb - gamma) * slope, 0)  # y2 = max((lambda - gamma)/(1 - gamma), 0)
+    y3 = (1 - y1 - y2)  # y3 = 1- y1 - y2
 
     if zero_stack is not None:
         label = torch.hstack((label1, zero_stack)) * y1 + torch.hstack((label2, zero_stack)) * y2 + label3 * y3
@@ -61,6 +65,7 @@ def middle_label_mix_process(label1, label2, num_base_classes, lamb, gamma):
         label = label1[:, :label3.size(1)] * y1 + label2[:, :label3.size(1)] * y2 + label3 * y3
 
     return label, mix_label_mask
+
 
 def middle_mixup_process(out, labels, num_base_classes, lamb, gamma=0.5):
     indices = np.random.permutation(out.size(0))

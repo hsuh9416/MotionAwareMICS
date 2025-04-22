@@ -35,9 +35,10 @@ def set_up_datasets(args):
         args.num_classes = 100
         args.way = 5
         args.shot = 5
-        args.sessions = 9 # base + 8 incremental sessions
+        args.sessions = 9  # base + 8 incremental sessions
         args.Dataset = CifarDataset
-        args.inc_learning_rate = 0.0005 # In the paper
+        args.num_features = 64
+        args.inc_learning_rate = 0.0005  # In the paper
     elif args.dataset == 'ucf101':
         args.base_class = 61  # Base classes for UCF101
         args.num_classes = 101
@@ -45,11 +46,13 @@ def set_up_datasets(args):
         args.shot = 5  # Number of shots per class
         args.sessions = 9  # base + 8 incremental sessions
         args.Dataset = UCF101Dataset
+        args.num_features = 512
         args.frames_per_clip = 16  # Number of frames per video clip
         args.step_between_clips = 8  # Step size between clips
         args.fold = 1  # Which fold to use (1, 2, or 3)
         args.inc_learning_rate = 0.0005  # In the paper
     return args
+
 
 def get_dataloader(args, session):
     if session == 0:
@@ -57,6 +60,7 @@ def get_dataloader(args, session):
     else:
         trainset, trainloader, testloader = get_new_dataloader(args, session)
     return trainset, trainloader, testloader
+
 
 def get_base_dataloader(args):
     class_index = np.arange(args.base_class)
@@ -67,9 +71,9 @@ def get_base_dataloader(args):
 
     if args.dataset == 'cifar100':
         trainset = args.Dataset.CIFAR100(root=args.dataroot, train=True, download=True,
-                                         index=class_index, base_sess=True, autoaug=is_autoaug)
+                                         index=class_index, base_sess=True)
         testset = args.Dataset.CIFAR100(root=args.dataroot, train=False, download=False,
-                                        index=class_index, base_sess=True, autoaug=is_autoaug)
+                                        index=class_index, base_sess=True)
     elif args.dataset == 'ucf101':
         trainset = args.Dataset.UCF101Dataset(root=args.dataroot, train=True, download=True,
                                               index=class_index, base_sess=True, autoaug=is_autoaug,
@@ -90,6 +94,7 @@ def get_base_dataloader(args):
 
     return trainset, trainloader, testloader
 
+
 def get_new_dataloader(args, session):
     if args.dataset == 'cifar100':
         txt_path = "data/index_list/" + args.dataset + "/session_" + str(session + 1) + '.txt'
@@ -108,14 +113,9 @@ def get_new_dataloader(args, session):
                                               step_between_clips=args.step_between_clips,
                                               fold=args.fold)
 
-    if hasattr(args, 'batch_size_new') and args.batch_size_new == 0:
-        batch_size_new = trainset.__len__()
-        trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=batch_size_new, shuffle=False,
-                                                  num_workers=args.num_workers, pin_memory=True)
-    else:
-        batch_size = args.batch_size_new if hasattr(args, 'batch_size_new') else args.batch_size
-        trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=batch_size, shuffle=True,
-                                                  num_workers=args.num_workers, pin_memory=True)
+    batch_size_new = trainset.__len__()
+    trainloader = torch.utils.data.DataLoader(dataset=trainset, batch_size=batch_size_new, shuffle=False,
+                                              num_workers=args.num_workers, pin_memory=True)
 
     # test on all encountered classes
     class_new = get_session_classes(args, session)
@@ -134,6 +134,7 @@ def get_new_dataloader(args, session):
                                              num_workers=args.num_workers, pin_memory=True)
 
     return trainset, trainloader, testloader
+
 
 def get_session_classes(args, session):
     class_list = np.arange(args.base_class + session * args.way)

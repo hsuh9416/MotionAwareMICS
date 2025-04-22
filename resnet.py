@@ -10,8 +10,10 @@ from urllib.request import urlopen
 import torch.nn as nn
 from mix_up import *
 
+
 class BasicBlock(nn.Module):
     expansion = 1
+
     def __init__(self, in_planes, planes, stride=1, downsample=None, groups=1,
                  base_width=64, dilation=1, is_last=False):
         super(BasicBlock, self).__init__()
@@ -22,7 +24,7 @@ class BasicBlock(nn.Module):
         self.bn2 = nn.BatchNorm2d(planes)
         self.downsample = downsample
         self.stride = stride
-        self.is_last = is_last # Investigates whether this is the last block or not
+        self.is_last = is_last  # Investigates whether this is the last block or not
         self.groups = groups
         self.base_width = base_width
         self.dilation = dilation
@@ -50,6 +52,7 @@ class BasicBlock(nn.Module):
         out = self.relu(out)
 
         return out
+
 
 class ResNet18(nn.Module):
     def __init__(self, block, layers, num_classes=100, downsample=None, groups=1,
@@ -107,7 +110,7 @@ class ResNet18(nn.Module):
         mix_label_mask = None
 
         # Pick the layer to conduct mix-up
-        layer_mix = random.randint(0, 3) # 0: Input, 1: First layer, 2: Second layer, 3: Third layer
+        layer_mix = random.randint(0, 3)  # 0: Input, 1: First layer, 2: Second layer, 3: Third layer
 
         out = x
 
@@ -152,6 +155,7 @@ class ResNet18(nn.Module):
 
         return out, new_labels, mix_label_mask
 
+
 class ResNet20(nn.Module):
     def __init__(self, block, layers, num_classes=100):
         super(ResNet20, self).__init__()
@@ -175,20 +179,20 @@ class ResNet20(nn.Module):
                 nn.Conv2d(self.in_planes, planes * expansion, kernel_size=1, stride=stride, bias=False),
                 nn.BatchNorm2d(planes * expansion))
 
-        layers = [] # Layer blocks.
+        layers = []  # Layer blocks.
 
         # Add the first block of the layer.(Downsampling applied)
         first_layer = block(self.in_planes, planes, stride, downsample)
         layers.append(first_layer)
 
-        self.in_planes = planes * expansion # Increase the number of input channels
+        self.in_planes = planes * expansion  # Increase the number of input channels
 
         # Add the remaining blocks of the layer.
-        for i in range(1, blocks-1):
+        for i in range(1, blocks - 1):
             layers.append(block(self.in_planes, planes))
 
         # Note for the final layer, is_last is always True.
-        last_layer = block(self.in_planes, planes, is_last = True if is_last else False)
+        last_layer = block(self.in_planes, planes, is_last=True if is_last else False)
         layers.append(last_layer)
 
         return nn.Sequential(*layers)
@@ -206,7 +210,7 @@ class ResNet20(nn.Module):
             https://medium.com/@mandalsouvik/manifold-mixup-learning-better-representations-by-interpolating-hidden-states-8a2c949d5b5b
         """
         # Pick the layer to conduct mix-up
-        layer_mix = random.randint(0, 2) # 0: Input, 1: First layer, 2: Second layer
+        layer_mix = random.randint(0, 2)  # 0: Input, 1: First layer, 2: Second layer
 
         # Compute lambda = beta distribution with mixup_alpha
         lamb = np.random.beta(mixup_alpha, mixup_alpha) if mixup_alpha > 0 else 1
@@ -241,6 +245,7 @@ class ResNet20(nn.Module):
 
         return out, new_labels, mix_label_mask
 
+
 def resnet18(**kwargs):
     """
      ResNet-18 model from
@@ -256,9 +261,11 @@ def resnet18(**kwargs):
 
     return model
 
+
 def resnet20(**kwargs):
     model = ResNet20(BasicBlock, [3, 3, 3], **kwargs)
     return model
+
 
 def _get_torch_home():
     ENV_TORCH_HOME = 'TORCH_HOME'
@@ -269,6 +276,7 @@ def _get_torch_home():
         os.getenv(ENV_TORCH_HOME,
                   os.path.join(os.getenv(ENV_XDG_CACHE_HOME, DEFAULT_CACHE_DIR), 'torch')))
     return torch_home
+
 
 def load_state_dict_from_url(url):
     r"""Loads the Torch serialized object at the given URL.
@@ -352,7 +360,3 @@ def _download_url_to_file(url, dst, hash_prefix, progress):
         f.close()
         if os.path.exists(f.name):
             os.remove(f.name)
-
-
-
-

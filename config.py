@@ -6,13 +6,16 @@ import multiprocessing
 # Common config class
 class Config:
     def __init__(self):
-        # Default
+        # Base
         self.device = torch.device("cuda")
-
-        # Increase dataloader workers based on virtual CPU count
-        self.num_workers = min(multiprocessing.cpu_count() * 2, 12)
-
+        self.phase = 'inc'
+        self.project = 'mics'
+        self.dataset = 'cifar100' # or 'ucf101'
         self.dataroot = '/content/drive/MyDrive/MotionAwareMICS/data/'  # Colab
+        self.gpu = 0
+        self.num_workers = 8
+        self.seed = 1
+        self.memo = ''
 
         # Training - Same as the paper
         self.base_mode = 'ft_cos'  # Cosine classifier
@@ -26,13 +29,13 @@ class Config:
         self.inc_learning_rate = 0.1  # Initial learning rate
         self.momentum = 0.9  # SGD momentum value
         self.weight_decay = 5e-4  # Weight decay (normalization)
-        self.temperature = 0.1  # Cosine similarity temperature scaling (mentioned in the paper)
+        self.temperature = 16  # Cosine similarity temperature scaling (mentioned in the paper)
         self.st_ratio = 0.01  # session trainable parameter ratio
 
         # MICS settings - based on Table 4 (Section 4.5) of the paper
         # CIFAR-100(Best practice)
         self.alpha = 0.5  # Parameters of the beta distribution
-        self.gamma = 0.5  # Parameters of soft labeling policy
+        self.gamma = 0.1  # Parameters of soft labeling policy
         self.epsilon = 0.01  # The percentage of parameters to update in incremental steps
 
         # Motion recognition settings

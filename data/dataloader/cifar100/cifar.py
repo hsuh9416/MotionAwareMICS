@@ -2,13 +2,11 @@ from PIL import Image
 import os
 import os.path
 import numpy as np
-import pickle
+
 import torchvision.transforms as transforms
 
 from torchvision.datasets.vision import VisionDataset
 from torchvision.datasets.utils import check_integrity, download_and_extract_archive
-from data.dataloader.cifar100.autoaugment import CIFAR10Policy, Cutout
-
 
 class CIFAR10(VisionDataset):
     """`CIFAR10 <https://www.cs.toronto.edu/~kriz/cifar.html>`_ Dataset.
@@ -49,7 +47,7 @@ class CIFAR10(VisionDataset):
     }
 
     def __init__(self, root, train=True, transform=None, target_transform=None,
-                 download=False, index=None, base_sess=None, autoaug=True):
+                 download=False, index=None, base_sess=True):
 
         super(CIFAR10, self).__init__(root, transform=transform,
                                       target_transform=target_transform)
@@ -63,40 +61,21 @@ class CIFAR10(VisionDataset):
             raise RuntimeError('Dataset not found or corrupted.' +
                                ' You can use download=True to download it')
 
-        if not autoaug:
-            if self.train:
-                downloaded_list = self.train_list
-                self.transform = transforms.Compose([
-                    transforms.RandomCrop(32, padding=4),
-                    transforms.RandomHorizontalFlip(),
-                    transforms.ToTensor(),
-                    transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])
-                ])
-            else:
-                downloaded_list = self.test_list
-                self.transform = transforms.Compose([
-                    transforms.ToTensor(),
-                    transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])
-                ])
+        # Non augmented
+        if self.train:
+            downloaded_list = self.train_list
+            self.transform = transforms.Compose([
+                transforms.RandomCrop(32, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])
+            ])
         else:
-            if self.train:
-                downloaded_list = self.train_list
-                self.transform = transforms.Compose([
-                    transforms.RandomCrop(32, padding=4),
-                    transforms.RandomHorizontalFlip(),
-                    CIFAR10Policy(),  # add AutoAug
-                    transforms.ToTensor(),
-                    Cutout(n_holes=1, length=16),
-                    transforms.Normalize(
-                        (0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
-                ])
-            else:
-                downloaded_list = self.test_list
-                self.transform = transforms.Compose([
-                    transforms.ToTensor(),
-                    transforms.Normalize(
-                        (0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
-                ])
+            downloaded_list = self.test_list
+            self.transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.507, 0.487, 0.441], std=[0.267, 0.256, 0.276])
+            ])
 
         self.data = []
         self.targets = []
@@ -132,7 +111,7 @@ class CIFAR10(VisionDataset):
         targets_tmp = []
         for i in index:
             ind_cl = np.where(i == targets)[0]
-            if len(data_tmp) == 0:
+            if data_tmp == []:
                 data_tmp = data[ind_cl]
                 targets_tmp = targets[ind_cl]
             else:
@@ -233,3 +212,27 @@ class CIFAR100(CIFAR10):
         'key': 'fine_label_names',
         'md5': '7973b15100ade9c7d40fb424638fde48',
     }
+
+
+if __name__ == "__main__":
+    dataroot = '/home/miil/Datasets/FSCIL-CEC'
+    batch_size_base = 128
+    txt_path = "../../index_list/cifar100/session_2.txt"
+    # class_index = open(txt_path).read().splitlines()
+    class_index = np.arange(60)
+    class_index_val = np.arange(60, 76)
+    class_index_test = np.arange(76, 100)
+
+    trainset = CIFAR100(root=dataroot, train=True, download=True, transform=None, index=class_index_test,
+                        base_sess=True)
+    testset = CIFAR100(root=dataroot, train=False, download=False, index=class_index, base_sess=True)
+
+    import pickle
+
+    print(trainset.data.shape)
+    print(trainset.targets.shape)
+    cls = np.unique(trainset.targets)
+    print(cls)
+    data = {'data': trainset.data, 'labels': trainset.targets}
+    with open('CIFAR100_test.pickle', 'wb') as handle:
+        pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)

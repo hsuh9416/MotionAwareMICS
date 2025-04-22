@@ -6,7 +6,6 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 from torchvision.datasets.vision import VisionDataset
-from data.dataloader.ucf101.autoaugment import VideoCutout
 
 class UCF101Dataset(VisionDataset):
     """UCF101 Action Recognition Dataset adapted for Few-Shot Class-Incremental Learning.
@@ -30,7 +29,7 @@ class UCF101Dataset(VisionDataset):
 
     def __init__(self, root, train=True, transform=None, target_transform=None,
                  download=False, index=None, base_sess=None, frames_per_clip=16,
-                 step_between_clips=8, fold=1, autoaug=True):
+                 step_between_clips=8, fold=1):
 
         super(UCF101Dataset, self).__init__(root, transform=transform,
                                             target_transform=target_transform)
@@ -42,39 +41,21 @@ class UCF101Dataset(VisionDataset):
         self.fold = fold
 
         # Set appropriate transforms based on dataset requirements
-        if not autoaug:
-            if self.train:
-                self.transform = transforms.Compose([
-                    transforms.Resize((128, 128)),
-                    transforms.RandomCrop(112),
-                    transforms.RandomHorizontalFlip(),
-                    transforms.ToTensor(),
-                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                ])
-            else:
-                self.transform = transforms.Compose([
-                    transforms.Resize((128, 128)),
-                    transforms.CenterCrop(112),
-                    transforms.ToTensor(),
-                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                ])
+        if self.train:
+            self.transform = transforms.Compose([
+                transforms.Resize((128, 128)),
+                transforms.RandomCrop(112),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ])
         else:
-            if self.train:
-                self.transform = transforms.Compose([
-                    transforms.Resize((128, 128)),
-                    transforms.RandomCrop(112),
-                    transforms.RandomHorizontalFlip(),
-                    transforms.ToTensor(),
-                    VideoCutout(n_holes=1, length=16), # Augmented
-                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                ])
-            else:
-                self.transform = transforms.Compose([
-                    transforms.Resize((128, 128)),
-                    transforms.CenterCrop(112),
-                    transforms.ToTensor(),
-                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                ])
+            self.transform = transforms.Compose([
+                transforms.Resize((128, 128)),
+                transforms.CenterCrop(112),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ])
 
         # Initialize the UCF101 dataset with torchvision
         try:
