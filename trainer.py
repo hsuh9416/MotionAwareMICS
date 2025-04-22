@@ -87,6 +87,7 @@ class MICSTrainer:
                 temp_model_dict = torch.load(self.pre_trained)['params']
                 for key, value in temp_model_dict.items():
                     if 'dummy' not in key:
+                        key = key.replace('module.', '')
                         best_model_dict[key] = value
             except:
                 temp_model_dict = torch.load(self.args.model_dir)['state_dict']
@@ -96,7 +97,7 @@ class MICSTrainer:
                         if 'shortcut' in temp_key:
                             temp_key = temp_key.replace('shortcut', 'downsample')
                         best_model_dict[temp_key] = value
-            best_model_dict['module.fc.weight'] = self.model.fc.weight
+            best_model_dict['fc.weight'] = self.model.fc.weight
             return best_model_dict
         else:
             print("Manually trains base model...")
@@ -371,6 +372,7 @@ class MICSTrainer:
         # 0. Global initialization
         best_acc = 0.0
         best_loss = 0.0
+        print(self.best_model_dict)
         self.model.load_state_dict(self.best_model_dict)
 
         # Get dataloader
