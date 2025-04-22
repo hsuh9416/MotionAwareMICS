@@ -8,8 +8,13 @@ import torch
 # Import user-defined modules
 from baseconfig import BaseConfig
 from data.dataloader.data_utils import set_up_datasets
-from evaluate import visualize_performance_comparison, visualize_pca, visualize_nVar
-from mics import MICS  # MICS model with motion-aware features
+from evaluate import (
+    visualize_pca,
+    visualize_nvar_progression,
+    visualize_accuracy_progression,
+    compute_nVar
+)
+from mics import MICS
 from trainer import MICSTrainer
 
 
@@ -25,6 +30,9 @@ def set_seed(seed=42):
 
 # Function to execute the entire MICS algorithm
 def run_process(config):
+    """Run the MICS training process and return results"""
+    print(f"\nInitializing MICS model for {config.dataset}...")
+
     # Initialize model with base classes
     model = MICS(config).cuda()
 
@@ -37,7 +45,41 @@ def run_process(config):
     # Evaluation results
     results = trainer.results
 
+    # Create visualizations for this dataset
+    create_visualizations(model, trainer, results, config)
+
     return results
+
+
+def create_visualizations(model, trainer, results, config):
+    """Create and save visualizations for the current dataset"""
+    print(f"\nGenerating visualizations for {config.dataset}...")
+
+    # Ensure the visualization directory exists
+    viz_dir = os.path.join(config.save_path, 'visualizations', config.dataset)
+    os.makedirs(viz_dir, exist_ok=True)
+
+    # 1. Visualize accuracy progression
+    print("- Creating accuracy progression visualization...")
+    visualize_accuracy_progression(results['acc'], config)
+
+    # 2. Visualize nVAR progression
+    print("- Creating nVAR progression visualization...")
+    visualize_nvar_progression(results['train_nVAR'], config)
+
+    # 3. Visualize PCA for the final session
+    print("- Creating PCA visualization for feature space...")
+    # Get data from the last session's test loader
+    final_session = len(results['acc']) - 1
+    _, _, test_loader = trainer.get_test_data(final_session)
+
+    # Calculate current classes based on session
+    current_classes = config.base_class + final_session * config.way
+
+    # Create PCA visualization
+    visualize_pca(model, test_loader, current_classes, final_session, config)
+
+    print(f"Visualizations saved to: {viz_dir}")
 
 
 # Main function
@@ -54,40 +96,44 @@ def main():
         shutil.rmtree(results_dir)
     os.makedirs(results_dir)
 
-    # Plain MICS (CIFAR-100)
-    print("=" * 50)
-    print("Running Plain MICS algorithm...")
-    print("=" * 50)
+    # Dictionary to store results
+    all_results = {}
 
-    # Ensure proper configuration for plain MICS
-    config.dataset = 'cifar100'
-    config = set_up_datasets(config)  # Setup Arguments
-    config.use_motion = False
-
-    # Run MICS algorithm and save checkpoints
-    plain_results = run_process(config)
-
-    # # Motion-aware MICS (HMDB51)
+    # Run CIFAR-100 experiment
     print("\n" + "=" * 50)
-    print("Running Motion-Aware MICS algorithm...")
+    print("Running MICS on CIFAR-100 dataset...")
     print("=" * 50)
 
-    # Reconfigure for motion-aware MICS
+    # Configure for CIFAR-100
+    config.dataset = 'cifar100'
+    config = set_up_datasets(config)
+    config.use_motion = False  # Disable motion awareness for CIFAR-100
+
+    # Run experiment
+    cifar_results = run_process(config)
+
+    print(f"\nCIFAR-100 Results:")
+    print(f"  Final Accuracy: {cifar_results['acc'][-1]:.2f}%")
+    print(f"  Performance Degradation: {cifar_results['acc'][0] - cifar_results['acc'][-1]:.2f}%")
+
+    # Run HMDB51 experiment with motion awareness
+    print("\n" + "=" * 50)
+    print("Running Motion-Aware MICS on HMDB51 dataset...")
+    print("=" * 50)
+
+    # Configure for HMDB51 with motion awareness
+    config.dataset = 'hmdb51'
+    config = set_up_datasets(config)
     config.use_motion = True
     config.flow_alpha = 0.5  # Optical flow weighting factor
-    config.dataset = 'hmdb51'
-    config = set_up_datasets(config)  # Setup Arguments
 
-    # Run Motion-Aware MICS algorithm
-    motion_results = run_process(config)
+    # Run motion-aware experiment
+    hmdb_results = run_process(config)
 
-    # Visualize and compare results
-    visualize_acc(plain_results['acc'], motion_results['acc'], config)
-    visualize_nVar(plain_results['train_nVAR'], motion_results['train_nVAR'], config)
+    print(f"\nHMDB51 Motion-Aware MICS Results:")
+    print(f"  Final Accuracy: {hmdb_results['acc'][-1]:.2f}%")
+    print(f"  Performance Degradation: {hmdb_results['acc'][0] - hmdb_results['acc'][-1]:.2f}%")
 
-    # Save detailed comparison
-    print("Performance Summary:")
-    print(
-        f"Plain MICS - Final Accuracy: {plain_results['acc'][-1]:.2f}%, PD: {plain_results['acc'][0] - plain_results['acc'][-1]:.2f}%")
-    print(
-        f"Motion-Aware MICS - Final Accuracy: {motion_results['acc'][-1]:.2f}%, PD: {motion_results['acc'][0] - motion_results['acc'][-1]:.2f}%")
+    print("\n" + "=" * 50)
+    print("All experiments completed successfully!")
+    print("=" * 50)
