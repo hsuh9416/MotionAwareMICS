@@ -56,7 +56,7 @@ class MICSTrainer:
         self.model = model
         self.results = self.set_acc_table()  # Init the accuracy table
         self.save_path = self.args.model_dir  # Save the model here
-
+        self.pre_trained = False
         self.best_model_dict = self.model.state_dict()  # Init the best model dict by initial state dict
 
     def set_acc_table(self):
@@ -77,6 +77,28 @@ class MICSTrainer:
         results["acc_new2"] = np.zeros([self.args.sessions])
 
         return results
+
+    def set_up_model(self):
+        """ Try load pre_trained model, if not, use initial model."""
+        if self.args.model_dir != None: # Load pre-trained model
+            self.pre_trained = True
+            print('Loading init parameters from: %s' % self.args.model_dir)
+            self.best_model_dict = dict()
+
+            try:
+                temp_model_dict = torch.load(self.args.model_dir)['params']
+                for key, value in temp_model_dict.items():
+                    if 'dummy' not in key:
+                        self.best_model_dict[key] = value
+            except:
+                temp_model_dict = torch.load(self.args.model_dir)['state_dict']
+                for key, value in temp_model_dict.items():
+                    if 'backbone' in key:
+                        temp_key = 'module.encoder' + key.split('backbone')[1]
+                        if 'shortcut' in temp_key:
+                            temp_key = temp_key.replace('shortcut', 'downsample')
+                        self.best_model_dict[temp_key] = value
+            self.best_model_dict['module.fc.weight'] = self.model.module.fc.weight
 
     def average_embedding(self, trainset, transform):
         """ replace fc.weight with the embedding average of train data """
