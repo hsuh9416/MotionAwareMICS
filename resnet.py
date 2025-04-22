@@ -215,6 +215,8 @@ class ResNet20(nn.Module):
         else:
             layer_mix = None
 
+        new_labels = None
+
         # Compute lambda = beta distribution with mixup_alpha
         lamb = np.random.beta(mixup_alpha, mixup_alpha) if mixup_alpha > 0 else 1
         lamb = torch.from_numpy(np.array([lamb]).astype('float32')).cuda()
@@ -247,8 +249,10 @@ class ResNet20(nn.Module):
         # Third layer
         out = self.layer3(out)
 
-        return out, new_labels, mix_label_mask
-
+        if labels is not None:
+            return out, new_labels, mix_label_mask
+        else:
+            return out
 
 def resnet18(**kwargs):
     """
