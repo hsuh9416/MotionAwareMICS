@@ -24,7 +24,6 @@ class UCF101Dataset(VisionDataset):
         frames_per_clip (int): Number of frames to extract per clip
         step_between_clips (int): Step size between clips
         fold (int): Which fold to use (1, 2, or 3)
-        autoaug (bool): Whether to use data augmentation
     """
 
     def __init__(self, root, train=True, transform=None, target_transform=None,

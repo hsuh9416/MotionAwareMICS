@@ -1,9 +1,8 @@
-import os
-import numpy as np
 import math
-import datetime
+import os
 from copy import deepcopy
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -286,7 +285,7 @@ class MICSTrainer:
 
         return tot_acc.val(), tot_loss.val()
 
-    def inc_train(self, model, train_loader, optimizer, lrc, epoch, args, P_st_idx=None):
+    def inc_train(self, model, train_loader, optimizer, lrc, epoch, args, P_st_idx=None, session=None):
         tot_acc = Averager()
         tot_loss = Averager()
         bce_loss = torch.nn.BCEWithLogitsLoss().cuda()
@@ -315,8 +314,8 @@ class MICSTrainer:
             # Compute accuracy
             acc += mix_up_accuracy_counting(output, label)[0] / 100.0
 
-            tqdm_gen.set_description('Session 0, epo {}, lrc={:.4f},total loss={:.4f} acc={:.4f}'
-                                     .format(epoch, lrc, loss.item(), acc))
+            tqdm_gen.set_description('Session {}, epoch {}, lrc={:.4f},total loss={:.4f} acc={:.4f}'
+                                     .format(session, epoch+1, lrc, loss.item(), acc))
 
             tot_acc.add(acc)
             tot_loss.add(loss.item())
@@ -415,7 +414,7 @@ class MICSTrainer:
                 self.model, P_st_idx = self.update_param(self.model, self.best_model_dict)
                 train_acc, train_loss = self.inc_train(self.model, train_loader, optimizer,
                                                        self.args.inc_learning_rate, epoch, self.args,
-                                                       P_st_idx)
+                                                       P_st_idx, session)
 
                 self.results["train_acc"][session].append(train_acc)
                 self.results["train_loss"][session].append(train_loss)
@@ -434,6 +433,9 @@ class MICSTrainer:
             avg_nvar = compute_nVar(self.model, train_loader, cur_num_classes)
             self.results['train_nVAR'][session] = avg_nvar
 
+            print(
+                f'[Train - Increment session {session}] Accuracy = {round(best_acc, 2)}, Loss = {round(best_loss, 2)}, nVAR = {round(avg_nvar, 2)}')
+
             # Replace the transform in the linked data loader with the transform used in the test set.
             train_loader.dataset.transform = train_transform
             self.model = self.average_embedding_inc(train_loader, np.unique(train_set.targets))  # Embedding
@@ -447,10 +449,6 @@ class MICSTrainer:
         # Save the final model
         save_model_dir = os.path.join(self.save_path, f'final_acc.pth')
         torch.save(dict(params=self.model.state_dict()), save_model_dir)
-
-        # print('\n*************** Final results ***************')
-        # print(self.results['max_acc'], '\n')
-        # self.print_table()
 
     def test(self, model, test_loader, args, session):
         """ Test session training """
@@ -534,47 +532,3 @@ class MICSTrainer:
             nvar = compute_nVar(model, test_loader, cur_num_classes)
 
         return self.results['acc'][session], tot_loss.val(), nvar
-
-    def print_table(self):
-        print("{:<13}{}".format("Pretraining:", self.args.base_mode.split('_')[-1]))
-        print("{:<13}{}".format("Similarity:", self.args.new_mode.split('_')[-1]))
-
-        str_head = "{:<9}".format('')
-        str_acc = "{:<9}".format('Acc:')
-        str_acc_base = "{:<9}".format('Base:')
-        str_acc_novel = "{:<9}".format('Novel:')
-        str_acc_old = "{:<9}".format('Old:')
-        str_acc_new = "{:<9}".format('New:')
-
-        for i in range(len(self.results['acc'])):
-            str_head = str_head + "{:<9}".format('sess' + str(int(i + 1)))
-            str_acc = str_acc + "{:<9}".format(str(round(self.results['acc'][i] * 100.0, 2)) + "%")
-            str_acc_base = str_acc_base + "{:<9}".format(str(round(self.results['acc_base'][i] * 100.0, 2)) + "%")
-            str_acc_novel = str_acc_novel + "{:<9}".format(str(round(self.results['acc_novel'][i] * 100.0, 2)) + "%")
-            str_acc_old = str_acc_old + "{:<9}".format(str(round(self.results['acc_old'][i] * 100.0, 2)) + "%")
-            str_acc_new = str_acc_new + "{:<9}".format(str(round(self.results['acc_new'][i] * 100.0, 2)) + "%")
-
-        print(str_head)
-        print(str_acc)
-        print(str_acc_base)
-        print(str_acc_novel)
-        print(str_acc_old)
-        print(str_acc_new)
-        print('\n')
-
-        str_acc_base2 = "{:<9}".format('Base2:')
-        str_acc_novel2 = "{:<9}".format('Novel2:')
-        str_acc_old2 = "{:<9}".format('Old2:')
-        str_acc_new2 = "{:<9}".format('New2:')
-
-        for i in range(len(self.results['acc'])):
-            str_acc_base2 = str_acc_base2 + "{:<9}".format(str(round(self.results['acc_base2'][i] * 100.0, 2)) + "%")
-            str_acc_novel2 = str_acc_novel2 + "{:<9}".format(str(round(self.results['acc_novel2'][i] * 100.0, 2)) + "%")
-            str_acc_old2 = str_acc_old2 + "{:<9}".format(str(round(self.results['acc_old2'][i] * 100.0, 2)) + "%")
-            str_acc_new2 = str_acc_new2 + "{:<9}".format(str(round(self.results['acc_new2'][i] * 100.0, 2)) + "%")
-
-        print(str_acc_base2)
-        print(str_acc_novel2)
-        print(str_acc_old2)
-        print(str_acc_new2)
-        print('\n')

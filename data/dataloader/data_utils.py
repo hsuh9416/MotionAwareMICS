@@ -81,12 +81,12 @@ def get_base_dataloader(args):
                                         index=class_index, base_sess=True)
     elif args.dataset == 'ucf101':
         trainset = args.Dataset.UCF101Dataset(root=args.dataroot, train=True, download=True,
-                                              index=class_index, base_sess=True, autoaug=is_autoaug,
+                                              index=class_index, base_sess=True,
                                               frames_per_clip=args.frames_per_clip,
                                               step_between_clips=args.step_between_clips,
                                               fold=args.fold)
         testset = args.Dataset.UCF101Dataset(root=args.dataroot, train=False, download=False,
-                                             index=class_index, base_sess=True, autoaug=is_autoaug,
+                                             index=class_index, base_sess=True,
                                              frames_per_clip=args.frames_per_clip,
                                              step_between_clips=args.step_between_clips,
                                              fold=args.fold)
