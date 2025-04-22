@@ -165,7 +165,7 @@ def visualize_pca(model, dataloader, current_classes, session_idx, config):
 
     # Save the visualization
     filename = f'{config.dataset}_pca_session_{session_idx}.png'
-    plt.savefig(os.path.join(save_dir, filename), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(config.visual_dir, filename), dpi=300, bbox_inches='tight')
     plt.close()
 
 
@@ -223,7 +223,7 @@ def visualize_nvar_progression(nvar_values, config):
 
     # Save the visualization
     filename = f'{config.dataset}_nvar_progression.png'
-    plt.savefig(os.path.join(save_dir, filename), dpi=300)
+    plt.savefig(os.path.join(config.visual_dir, filename), dpi=300)
     plt.close()
 
 
@@ -268,7 +268,7 @@ def visualize_class_separation(nvar_class_values, session_idx, config):
 
     # Save the visualization
     filename = f'{config.dataset}_class_separation_session_{session_idx}.png'
-    plt.savefig(os.path.join(save_dir, filename), dpi=300)
+    plt.savefig(os.path.join(config.visual_dir, filename), dpi=300)
     plt.close()
 
 
@@ -324,7 +324,7 @@ def visualize_accuracy_progression(accuracy_values, config):
 
     # Save the visualization
     filename = f'{config.dataset}_accuracy_progression.png'
-    plt.savefig(os.path.join(save_dir, filename), dpi=300)
+    plt.savefig(os.path.join(config.visual_dir, filename), dpi=300)
     plt.close()
 
 
@@ -447,7 +447,7 @@ def analyze_fscil_performance(results, config):
 
     # Save comprehensive analysis
     filename = f'{config.dataset}_comprehensive_analysis.png'
-    plt.savefig(os.path.join(save_dir, filename), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(config.visual_dir, filename), dpi=300, bbox_inches='tight')
     plt.close()
 
     # Return summary statistics
@@ -535,7 +535,7 @@ def compare_motion_vs_standard(motion_results, standard_results, config):
 
     # Save comparison
     filename = 'hmdb51_motion_vs_standard_comparison.png'
-    plt.savefig(os.path.join(save_dir, filename), dpi=300)
+    plt.savefig(os.path.join(config.visual_dir, filename), dpi=300)
     plt.close()
 
     # Calculate improvement stats

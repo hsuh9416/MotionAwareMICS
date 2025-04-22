@@ -31,8 +31,6 @@ def set_seed(seed=42):
 # Function to execute the entire MICS algorithm
 def run_process(config):
     """Run the MICS training process and return results"""
-    print(f"\nInitializing MICS model for {config.dataset}...")
-
     # Initialize model with base classes
     model = MICS(config).cuda()
 
@@ -53,22 +51,18 @@ def run_process(config):
 
 def create_visualizations(model, trainer, results, config):
     """Create and save visualizations for the current dataset"""
-    print(f"\nGenerating visualizations for {config.dataset}...")
 
     # Ensure the visualization directory exists
     viz_dir = os.path.join(config.save_path, 'visualizations', config.dataset)
     os.makedirs(viz_dir, exist_ok=True)
 
     # 1. Visualize accuracy progression
-    print("- Creating accuracy progression visualization...")
     visualize_accuracy_progression(results['acc'], config)
 
     # 2. Visualize nVAR progression
-    print("- Creating nVAR progression visualization...")
     visualize_nvar_progression(results['train_nVAR'], config)
 
     # 3. Visualize PCA for the final session
-    print("- Creating PCA visualization for feature space...")
     # Get data from the last session's test loader
     final_session = len(results['acc']) - 1
     _, _, test_loader = trainer.get_test_data(final_session)
@@ -78,8 +72,6 @@ def create_visualizations(model, trainer, results, config):
 
     # Create PCA visualization
     visualize_pca(model, test_loader, current_classes, final_session, config)
-
-    print(f"Visualizations saved to: {viz_dir}")
 
 
 # Main function
@@ -91,10 +83,10 @@ def main():
     config = BaseConfig()
 
     # Setup directory for result saving
-    results_dir = '/content/drive/MyDrive/MotionAwareMICS/results'
-    if os.path.exists(results_dir):
-        shutil.rmtree(results_dir)
-    os.makedirs(results_dir)
+    config.results_dir = '/content/drive/MyDrive/MotionAwareMICS/results'
+    if os.path.exists(config.results_dir):
+        shutil.rmtree(config.results_dir)
+    os.makedirs(config.results_dir)
 
     # Dictionary to store results
     all_results = {}

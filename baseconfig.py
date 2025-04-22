@@ -14,6 +14,10 @@ class BaseConfig:
         self.dataroot = '/content/drive/MyDrive/MotionAwareMICS/data/'  # Colab
         if not os.path.exists(self.dataroot):
             os.makedirs(self.dataroot, exist_ok=True)
+        self.results_dir = '/content/drive/MyDrive/MotionAwareMICS/results'
+        self.visual_dir = '/content/drive/MyDrive/MotionAwareMICS/visualizations'
+        if not os.path.exists(self.visual_dir):
+            os.makedirs(self.visual_dir, exist_ok=True)
 
         self.gpu = 0
         self.num_workers = 8
