@@ -2,6 +2,7 @@
 import torch
 import multiprocessing
 
+
 # Common config class
 class Config:
     def __init__(self):
@@ -11,22 +12,22 @@ class Config:
         # Increase dataloader workers based on virtual CPU count
         self.num_workers = min(multiprocessing.cpu_count() * 2, 12)
 
-        self.dataroot = '/content/drive/MyDrive/MotionAwareMICS/data/' # Colab
+        self.dataroot = '/content/drive/MyDrive/MotionAwareMICS/data/'  # Colab
 
         # Training - Same as the paper
-        self.base_mode = 'ft_cos' # Cosine classifier
-        self.new_mode = 'avg_cos' # Average data embedding / Cosine classifier
-        self.schedule = 'Step' # Schedule function
-        self.step_size = 40 # Check schedule every 40 epochs
-        self.batch_size = 128 # High-capacity fits with A100 GPU
-        self.base_epochs = 100 # Base session epoch number
-        self.inc_epochs = 100 # Incremental session epoch number
-        self.learning_rate = 0.1 # Initial learning rate
+        self.base_mode = 'ft_cos'  # Cosine classifier
+        self.new_mode = 'avg_cos'  # Average data embedding / Cosine classifier
+        self.schedule = 'Step'  # Schedule function
+        self.step_size = 40  # Check schedule every 40 epochs
+        self.batch_size = 128  # High-capacity fits with A100 GPU
+        self.base_epochs = 100  # Base session epoch number
+        self.inc_epochs = 100  # Incremental session epoch number
+        self.learning_rate = 0.1  # Initial learning rate
         self.inc_learning_rate = 0.1  # Initial learning rate
-        self.momentum = 0.9 # SGD momentum value
-        self.weight_decay = 5e-4 # Weight decay (normalization)
-        self.temperature = 0.1 # Cosine similarity temperature scaling (mentioned in the paper)
-        self.st_ratio = 0.01 # session trainable parameter ratio
+        self.momentum = 0.9  # SGD momentum value
+        self.weight_decay = 5e-4  # Weight decay (normalization)
+        self.temperature = 0.1  # Cosine similarity temperature scaling (mentioned in the paper)
+        self.st_ratio = 0.01  # session trainable parameter ratio
 
         # MICS settings - based on Table 4 (Section 4.5) of the paper
         # CIFAR-100(Best practice)
@@ -36,4 +37,4 @@ class Config:
 
         # Motion recognition settings
         self.use_motion = False  # Whether motion recognition function is enabled
-        self.flow_alpha = 0.5    # optical flow weighting
+        self.flow_alpha = 0.5  # optical flow weighting
