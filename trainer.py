@@ -12,6 +12,7 @@ from tqdm import tqdm
 from data.dataloader.data_utils import get_dataloader
 from evaluate import compute_nVar
 
+
 def accuracy_counting(logits, label):
     """ Accuracy by counting """
     pred = torch.argmax(logits, dim=1)
@@ -55,7 +56,7 @@ class MICSTrainer:
         self.args = args
         self.model = model
         self.results = self.set_acc_table()  # Init the accuracy table
-        self.save_path = self.args.model_dir # Save the model here
+        self.save_path = self.args.model_dir  # Save the model here
 
         self.best_model_dict = self.model.state_dict()  # Init the best model dict by initial state dict
 
@@ -120,7 +121,8 @@ class MICSTrainer:
         # Calculate prototypes by class
         proto_list = []
         for class_index in range(self.args.base_class):
-            data_index = (label_list == class_index).nonzero()  # nonzero: returns all non-zero elements' indices of the input tensor.
+            data_index = (
+                        label_list == class_index).nonzero()  # nonzero: returns all non-zero elements' indices of the input tensor.
             embedding_this = embedding_list[
                 data_index.squeeze(-1)]  # [N, 1] -> [N] then embedding for each data point by index
             embedding_mean = embedding_this.mean(0)  # Averaging
@@ -148,7 +150,7 @@ class MICSTrainer:
         new_fc = []
         for class_index in class_list:
             data_index = (
-                        label == class_index).nonzero()  # nonzero: returns all non-zero elements' indices of the input tensor.
+                    label == class_index).nonzero()  # nonzero: returns all non-zero elements' indices of the input tensor.
             embedding = data[data_index.squeeze(-1)]  # [N, 1] -> [N] then embedding for each data point by index
             proto = embedding.mean(0)  # Averaging
             new_fc.append(proto)
@@ -270,7 +272,7 @@ class MICSTrainer:
             # Process update
             tqdm_gen.set_description(
                 'Base Session, epoch {}, lrc={:.4f}, total loss={:.4f} acc={:.4f}'
-                .format(epoch+1, cur_lr, loss.item(), acc)
+                .format(epoch + 1, cur_lr, loss.item(), acc)
             )
 
             # Update average loss and accuracy
@@ -368,7 +370,7 @@ class MICSTrainer:
             self.results["train_loss"][0].append(train_loss)
 
             # Save the best model
-            if train_acc > best_acc or (train_acc == best_acc and train_loss < best_loss):
+            if train_acc > best_acc:
                 best_acc = train_acc
                 best_loss = train_loss
                 save_model_dir = os.path.join(self.save_path, 'base_session_max_acc.pth')
@@ -419,7 +421,7 @@ class MICSTrainer:
                 self.results["train_loss"][session].append(train_loss)
 
                 # Save the best model
-                if train_acc > best_acc or (train_acc == best_acc and train_loss < best_loss):
+                if train_acc > best_acc:
                     best_acc = train_acc
                     best_loss = train_loss
                     save_model_dir = os.path.join(self.save_path, f'inc_session_{session}_max_acc.pth')
