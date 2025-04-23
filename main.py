@@ -1,7 +1,8 @@
 # Import necessary libraries
 import os
-import shutil
 import random
+import shutil
+
 import numpy as np
 import torch
 
@@ -11,12 +12,11 @@ from data.dataloader.data_utils import set_up_datasets
 from evaluate import (
     visualize_pca,
     visualize_nvar_progression,
-    visualize_accuracy_progression,
-    compute_nVar
+    visualize_accuracy_progression
 )
 from mics import MICS
 from trainer import MICSTrainer
-
+from data.dataloader.data_utils import get_new_dataloader
 
 # Seed setting for reproducibility
 def set_seed(seed=42):
@@ -44,16 +44,16 @@ def run_process(config):
     results = trainer.results
 
     # Create visualizations for this dataset
-    create_visualizations(model, trainer, results, config)
+    create_visualizations(model, results, config)
 
     return results
 
 
-def create_visualizations(model, trainer, results, config):
+def create_visualizations(model, results, config):
     """Create and save visualizations for the current dataset"""
 
     # Ensure the visualization directory exists
-    viz_dir = os.path.join(config.save_path, 'visualizations', config.dataset)
+    viz_dir = os.path.join(config.visual_dir, 'visualizations', config.dataset)
     os.makedirs(viz_dir, exist_ok=True)
 
     # 1. Visualize accuracy progression
@@ -65,7 +65,7 @@ def create_visualizations(model, trainer, results, config):
     # 3. Visualize PCA for the final session
     # Get data from the last session's test loader
     final_session = len(results['acc']) - 1
-    _, _, test_loader = trainer.get_test_data(final_session)
+    _, _, test_loader = get_new_dataloader(config, final_session)
 
     # Calculate current classes based on session
     current_classes = config.base_class + final_session * config.way

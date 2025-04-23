@@ -68,9 +68,6 @@ def compute_nVar(model, dataloader, num_classes):
 # PCA visualization function (Per session)
 def visualize_pca(model, dataloader, current_classes, session_idx, config):
     """Generate 2D PCA visualization of feature space and class distributions"""
-    # Directory for saving results
-    save_dir = os.path.join(config.save_path, config.dataset)
-    os.makedirs(save_dir, exist_ok=True)
 
     model.eval()
     all_features = []
@@ -172,9 +169,6 @@ def visualize_pca(model, dataloader, current_classes, session_idx, config):
 # Visualize nVAR progression across sessions
 def visualize_nvar_progression(nvar_values, config):
     """Visualize how nVAR changes across training sessions"""
-    # Directory for saving results
-    save_dir = os.path.join(config.save_path, config.dataset)
-    os.makedirs(save_dir, exist_ok=True)
 
     sessions = list(range(len(nvar_values)))
 
@@ -233,10 +227,6 @@ def visualize_class_separation(nvar_class_values, session_idx, config):
     if not nvar_class_values:
         return
 
-    # Directory for saving results
-    save_dir = os.path.join(config.save_path, config.dataset)
-    os.makedirs(save_dir, exist_ok=True)
-
     plt.figure(figsize=(12, 6))
 
     # Set style based on dataset
@@ -275,9 +265,6 @@ def visualize_class_separation(nvar_class_values, session_idx, config):
 # Visualize accuracy per session
 def visualize_accuracy_progression(accuracy_values, config):
     """Visualize how accuracy changes across training sessions"""
-    # Directory for saving results
-    save_dir = os.path.join(config.save_path, config.dataset)
-    os.makedirs(save_dir, exist_ok=True)
 
     sessions = list(range(len(accuracy_values)))
 
@@ -331,9 +318,6 @@ def visualize_accuracy_progression(accuracy_values, config):
 # Comprehensive analysis of FSCIL performance
 def analyze_fscil_performance(results, config):
     """Create a comprehensive analysis dashboard for FSCIL performance"""
-    # Directory for saving results
-    save_dir = os.path.join(config.save_path, config.dataset)
-    os.makedirs(save_dir, exist_ok=True)
 
     # Extract metrics from results
     acc = results['acc']
