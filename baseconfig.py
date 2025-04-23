@@ -19,7 +19,7 @@ class BaseConfig:
         self.results_dir = f'{root_dir}results' # Results save
         if os.path.exists(self.results_dir):
             shutil.rmtree(self.results_dir)
-        os.makedirs(config.results_dir, exist_ok=True)
+        os.makedirs(self.results_dir, exist_ok=True)
 
         self.visual_dir = f'{root_dir}pictures' # Visual artifacts
         if os.path.exists(self.visual_dir):
