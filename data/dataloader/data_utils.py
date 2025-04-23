@@ -51,12 +51,12 @@ def set_up_datasets(args):
         args.sessions = 5  # base + 4 incremental sessions
         args.Dataset = HMDB51Dataset
         args.num_features = 512
-        args.frames_per_clip = 16  # Number of frames per video clip
+        args.frames_per_clip = 8  # Number of frames per video clip
         args.step_between_clips = 8  # Step size between clips
         args.fold = 1  # Which fold to use (1, 2, or 3)
         # Updates
-        args.epochs_base = 30  # Base session epoch number
-        args.batch_size = 16  # Videos require more memory
+        args.epochs_base = 20  # Base session epoch number
+        args.batch_size = 4  # Videos require more memory
         args.inc_learning_rate = 0.0005  # In the paper
     return args
 
