@@ -56,7 +56,7 @@ def set_up_datasets(args):
         args.fold = 1  # Which fold to use (1, 2, or 3)
         # Updates
         args.epochs_base = 5  # Base session epoch number
-        args.batch_size = 16  # Videos require more memory
+        args.batch_size = 8  # Videos require more memory
         args.inc_learning_rate = 0.0005  # In the paper
     return args
 
