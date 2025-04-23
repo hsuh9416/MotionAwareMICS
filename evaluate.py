@@ -165,7 +165,6 @@ def visualize_pca(model, dataloader, current_classes, session_idx, config):
     plt.savefig(os.path.join(config.visual_dir, filename), dpi=300, bbox_inches='tight')
     plt.close()
 
-
 # Visualize nVAR progression across sessions
 def visualize_nvar_progression(nvar_values, config):
     """Visualize how nVAR changes across training sessions"""
@@ -220,48 +219,6 @@ def visualize_nvar_progression(nvar_values, config):
     plt.savefig(os.path.join(config.visual_dir, filename), dpi=300)
     plt.close()
 
-
-# Visualize class separation in feature space
-def visualize_class_separation(nvar_class_values, session_idx, config):
-    """Visualize the distribution of nVAR values across classes"""
-    if not nvar_class_values:
-        return
-
-    plt.figure(figsize=(12, 6))
-
-    # Set style based on dataset
-    if config.dataset == 'cifar100':
-        color = 'tab:blue'
-        title = f'CIFAR-100: Class Separation Distribution (Session {session_idx})'
-    else:  # HMDB51
-        color = 'tab:orange'
-        title = f'HMDB51: Class Separation Distribution (Session {session_idx})'
-
-    # Create histogram of nVAR values
-    sns.histplot(nvar_class_values, kde=True, color=color)
-
-    # Add mean and median markers
-    mean_val = np.mean(nvar_class_values)
-    median_val = np.median(nvar_class_values)
-
-    plt.axvline(mean_val, color='red', linestyle='--',
-                label=f'Mean: {mean_val:.4f}')
-    plt.axvline(median_val, color='green', linestyle='-',
-                label=f'Median: {median_val:.4f}')
-
-    # Format plot
-    plt.title(title, fontsize=16, fontweight='bold')
-    plt.xlabel('nVAR Value (lower is better)', fontsize=14)
-    plt.ylabel('Number of Classes', fontsize=14)
-    plt.grid(True, linestyle='--', alpha=0.3)
-    plt.legend()
-
-    # Save the visualization
-    filename = f'{config.dataset}_class_separation_session_{session_idx}.png'
-    plt.savefig(os.path.join(config.visual_dir, filename), dpi=300)
-    plt.close()
-
-
 # Visualize accuracy per session
 def visualize_accuracy_progression(accuracy_values, config):
     """Visualize how accuracy changes across training sessions"""
@@ -286,14 +243,14 @@ def visualize_accuracy_progression(accuracy_values, config):
     pd = accuracy_values[0] - accuracy_values[-1]
 
     # Annotate first and last points
-    plt.annotate(f'Base: {accuracy_values[0]:.2f}%',
+    plt.annotate(f'Base: {accuracy_values[0]:.2f}',
                  (0, accuracy_values[0]),
                  textcoords="offset points",
                  xytext=(10, 0),
                  ha='left',
                  fontsize=12)
 
-    plt.annotate(f'Final: {accuracy_values[-1]:.2f}%\nPD: {pd:.2f}%',
+    plt.annotate(f'Final: {accuracy_values[-1]:.2f}\nPD: {pd:.2f}',
                  (len(accuracy_values) - 1, accuracy_values[-1]),
                  textcoords="offset points",
                  xytext=(-10, -20),
@@ -303,7 +260,7 @@ def visualize_accuracy_progression(accuracy_values, config):
     # Format plot
     plt.title(title, fontsize=16, fontweight='bold')
     plt.xlabel('Session', fontsize=14)
-    plt.ylabel('Accuracy (%)', fontsize=14)
+    plt.ylabel('Accuracy', fontsize=14)
     plt.grid(True, linestyle='--', alpha=0.7)
 
     # Integer x-axis
@@ -350,7 +307,7 @@ def analyze_fscil_performance(results, config):
 
     # Calculate PD and annotate
     pd = acc[0] - acc[-1]
-    axes[0, 0].annotate(f'PD: {pd:.2f}%',
+    axes[0, 0].annotate(f'PD: {pd:.2f}',
                         (sessions[-1], acc[-1]),
                         textcoords="offset points",
                         xytext=(-20, -30),
@@ -372,7 +329,7 @@ def analyze_fscil_performance(results, config):
 
     axes[0, 1].set_title('Base vs. Novel Class Performance', fontsize=16)
     axes[0, 1].set_xlabel('Session', fontsize=14)
-    axes[0, 1].set_ylabel('Accuracy (%)', fontsize=14)
+    axes[0, 1].set_ylabel('Accuracy', fontsize=14)
     axes[0, 1].grid(True, linestyle='--', alpha=0.7)
     axes[0, 1].legend(fontsize=12)
     axes[0, 1].xaxis.set_major_locator(MaxNLocator(integer=True))
@@ -446,96 +403,3 @@ def analyze_fscil_performance(results, config):
     }
 
     return summary
-
-
-# Compare motion-aware vs standard approach for HMDB51
-def compare_motion_vs_standard(motion_results, standard_results, config):
-    """Compare motion-aware MICS with standard MICS for HMDB51 dataset"""
-    if config.dataset != 'hmdb51':
-        return None
-
-    # Directory for saving results
-    save_dir = os.path.join(config.save_path, config.dataset)
-    os.makedirs(save_dir, exist_ok=True)
-
-    # Extract performance metrics
-    motion_acc = motion_results['acc']
-    standard_acc = standard_results['acc']
-
-    motion_nvar = motion_results['train_nVAR']
-    standard_nvar = standard_results['train_nVAR']
-
-    sessions = list(range(len(motion_acc)))
-
-    # Create comparison visualization
-    fig, axes = plt.subplots(2, 1, figsize=(12, 14))
-
-    # 1. Accuracy Comparison
-    axes[0].plot(sessions, motion_acc, marker='o', linestyle='-',
-                 linewidth=3, color='tab:blue', markersize=10,
-                 label='Motion-Aware MICS')
-    axes[0].plot(sessions, standard_acc, marker='s', linestyle='--',
-                 linewidth=3, color='tab:orange', markersize=10,
-                 label='Standard MICS')
-
-    # Calculate PD values
-    motion_pd = motion_acc[0] - motion_acc[-1]
-    standard_pd = standard_acc[0] - standard_acc[-1]
-
-    # Annotate PD values
-    axes[0].annotate(f'PD: {motion_pd:.2f}%',
-                     xy=(sessions[-1], motion_acc[-1]),
-                     xytext=(sessions[-1] - 1, motion_acc[-1] - 5),
-                     arrowprops=dict(arrowstyle='->'))
-
-    axes[0].annotate(f'PD: {standard_pd:.2f}%',
-                     xy=(sessions[-1], standard_acc[-1]),
-                     xytext=(sessions[-1] - 1, standard_acc[-1] + 5),
-                     arrowprops=dict(arrowstyle='->'))
-
-    axes[0].set_title('Motion-Aware vs Standard MICS: Accuracy Comparison', fontsize=16)
-    axes[0].set_xlabel('Session', fontsize=14)
-    axes[0].set_ylabel('Accuracy (%)', fontsize=14)
-    axes[0].grid(True, linestyle='--', alpha=0.7)
-    axes[0].legend(fontsize=12)
-    axes[0].xaxis.set_major_locator(MaxNLocator(integer=True))
-
-    # 2. nVAR Comparison
-    axes[1].plot(sessions, motion_nvar, marker='o', linestyle='-',
-                 linewidth=3, color='tab:blue', markersize=10,
-                 label='Motion-Aware MICS')
-    axes[1].plot(sessions, standard_nvar, marker='s', linestyle='--',
-                 linewidth=3, color='tab:orange', markersize=10,
-                 label='Standard MICS')
-
-    axes[1].set_title('Motion-Aware vs Standard MICS: nVAR Comparison', fontsize=16)
-    axes[1].set_xlabel('Session', fontsize=14)
-    axes[1].set_ylabel('Normalized Variance (nVAR)', fontsize=14)
-    axes[1].grid(True, linestyle='--', alpha=0.7)
-    axes[1].legend(fontsize=12)
-    axes[1].xaxis.set_major_locator(MaxNLocator(integer=True))
-
-    plt.tight_layout()
-
-    # Save comparison
-    filename = 'hmdb51_motion_vs_standard_comparison.png'
-    plt.savefig(os.path.join(config.visual_dir, filename), dpi=300)
-    plt.close()
-
-    # Calculate improvement stats
-    final_acc_improvement = motion_acc[-1] - standard_acc[-1]
-    pd_improvement = standard_pd - motion_pd
-    nvar_improvement = standard_nvar[-1] - motion_nvar[-1]
-
-    # Return comparison stats
-    comparison = {
-        'final_acc_improvement': final_acc_improvement,
-        'pd_improvement': pd_improvement,
-        'nvar_improvement': nvar_improvement,
-        'motion_final_acc': motion_acc[-1],
-        'standard_final_acc': standard_acc[-1],
-        'motion_pd': motion_pd,
-        'standard_pd': standard_pd
-    }
-
-    return comparison
