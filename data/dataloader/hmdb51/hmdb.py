@@ -1,11 +1,13 @@
 import os
+import torch
+import torch.utils.data as data
+from torch.utils.data import DataLoader
+from torchvision import transforms
+from torchvision.datasets import HMDB51
 
 import av
 import numpy as np
-import torch
-import torch.utils.data as data
 from PIL import Image
-from torchvision import transforms
 
 
 class HMDB51(data.Dataset):
@@ -44,7 +46,9 @@ class HMDB51(data.Dataset):
 
         # Set paths for data
         self.data_dir = os.path.join(self.root, 'hmdb51')
+        self.video_dir = os.path.join(self.data_dir , 'videos')
         os.makedirs(self.data_dir, exist_ok=True)
+        os.makedirs(self.video_dir, exist_ok=True)
 
         # Download dataset if requested
         if download:
@@ -58,6 +62,7 @@ class HMDB51(data.Dataset):
     def _download_hmdb51(self):
         """Download HMDB51 dataset using torchvision."""
         try:
+
             # Use torchvision's HMDB51 if available
             from torchvision.datasets import HMDB51 as TorchHMDB51
 

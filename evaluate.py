@@ -91,7 +91,7 @@ def visualize_pca(model, dataloader, current_classes, session_idx, config):
                 features = torch.stack(features_list, dim=1).mean(dim=1)
             else:
                 # Regular image data
-                features = model(inputs, return_features=True)
+                features =  model.encode(inputs)
 
             all_features.append(features.cpu().numpy())
             all_labels.append(targets.cpu().numpy())
