@@ -1,7 +1,7 @@
 # Import necessary libraries
 import os
 import random
-
+import gc
 
 import numpy as np
 import torch
@@ -78,6 +78,14 @@ def create_visualizations(model, results, config):
 def main(root_dir):
     # Set seed for reproducibility
     set_seed(1)
+
+    # Add memory management
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    # Enable TF32 precision for faster processing and better memory efficiency
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
 
     # Call pre-set config
     config = BaseConfig(root_dir)

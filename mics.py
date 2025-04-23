@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import cv2
+import gc
 
 from resnet import resnet18, resnet20
 from mix_up import to_one_hot, middle_label_mix_process
@@ -192,6 +193,11 @@ class MotionAwareMixup(nn.Module):
 
         # Convert to tensor [2, T-1, H, W]
         flow_tensor = torch.tensor(np.array(flows).transpose(1, 0, 2, 3), dtype=torch.float32)
+
+        # Add at the end of the function
+        gc.collect()
+        torch.cuda.empty_cache()
+
         return flow_tensor
 
     def forward(self, x1, x2, lam):

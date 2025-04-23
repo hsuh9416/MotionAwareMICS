@@ -55,8 +55,8 @@ def set_up_datasets(args):
         args.step_between_clips = 8  # Step size between clips
         args.fold = 1  # Which fold to use (1, 2, or 3)
         # Updates
-        args.epochs_base = 100  # Base session epoch number
-        args.batch_size = 16  # Videos require more memory
+        args.epochs_base = 5  # Base session epoch number
+        args.batch_size = 8  # Videos require more memory
         args.inc_learning_rate = 0.0005  # In the paper
     return args
 
