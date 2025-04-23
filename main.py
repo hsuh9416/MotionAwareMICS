@@ -82,15 +82,6 @@ def main(root_dir):
     # Call pre-set config
     config = BaseConfig(root_dir)
 
-    # Setup directory for result saving
-    config.results_dir = '/content/drive/MyDrive/MotionAwareMICS/results'
-    if os.path.exists(config.results_dir):
-        shutil.rmtree(config.results_dir)
-    os.makedirs(config.results_dir)
-
-    # Dictionary to store results
-    all_results = {}
-
     # Run CIFAR-100 experiment
     print("\n" + "=" * 50)
     print("Running MICS on CIFAR-100 dataset...")

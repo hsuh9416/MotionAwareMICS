@@ -76,7 +76,19 @@ class MICS(nn.Module):
         return mid
 
     def forward(self, x):
-        x = self.encode(x)
+        # Handle video data
+        if len(x.shape) == 5:  # [B, C, T, H, W]
+            B, C, T, H, W = x.shape
+
+            # Process each frame separately and average
+            frame_features = []
+            for t in range(T):
+                frame = x[:, :, t]  # [B, C, H, W]
+                frame_features.append(self.encode(frame))
+
+            x = torch.stack(frame_features, dim=1).mean(dim=1)
+        else:
+            x = self.encode(x)
         if self.mode != 'encoder':  # classification
             # Cosine similarity
             x = F.linear(F.normalize(x, p=2, dim=-1), F.normalize(self.fc.weight, p=2, dim=-1))
