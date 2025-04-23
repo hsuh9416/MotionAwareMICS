@@ -1,23 +1,34 @@
 # Import necessary libraries
 import torch
 import os
-
+import shutil
 
 # Common config class
 class BaseConfig:
-    def __init__(self):
+    def __init__(self, root_dir):
         # Base
+        self.root_dir = root_dir
+
         self.device = torch.device("cuda")
         self.phase = 'inc'
         self.project = 'mics'
         self.dataset = 'cifar100'  # or 'ucf101'
-        self.dataroot = '/content/drive/MyDrive/MotionAwareMICS/data/'  # Colab
-        if not os.path.exists(self.dataroot):
-            os.makedirs(self.dataroot, exist_ok=True)
-        self.results_dir = '/content/drive/MyDrive/MotionAwareMICS/results'
-        self.visual_dir = '/content/drive/MyDrive/MotionAwareMICS/pictures'
-        if not os.path.exists(self.visual_dir):
-            os.makedirs(self.visual_dir, exist_ok=True)
+
+        self.dataroot = f'{root_dir}data/'  # data dir
+
+        self.results_dir = f'{root_dir}results' # Results save
+        if os.path.exists(self.results_dir):
+            shutil.rmtree(config.results_dir)
+        os.makedirs(config.results_dir, exist_ok=True)
+
+        self.visual_dir = f'{root_dir}pictures' # Visual artifacts
+        if os.path.exists(self.visual_dir):
+            shutil.rmtree(config.visual_dir)
+        os.makedirs(self.visual_dir, exist_ok=True)
+
+        self.model_dir = f'{root_dir}models/' # Trained model/weights
+        if not os.path.exists(self.model_dir):
+            os.makedirs(self.model_dir, exist_ok=True)
 
         self.gpu = 0
         self.num_workers = 8
@@ -43,9 +54,7 @@ class BaseConfig:
         self.base_mode = 'ft_cos'  # Cosine classifier
         self.new_mode = 'avg_cos'  # Average data embedding / Cosine classifier
         # self.start_session = 0
-        self.model_dir = '/content/drive/MyDrive/MotionAwareMICS/models/'
-        if not os.path.exists(self.model_dir):
-            os.makedirs(self.model_dir, exist_ok=True)
+
 
         # MICS settings - based on Table 4 (Section 4.5) of the paper
         self.st_ratio = 0.01  # session trainable parameter ratio

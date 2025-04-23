@@ -1,7 +1,7 @@
 # Import necessary libraries
 import os
 import random
-import shutil
+
 
 import numpy as np
 import torch
@@ -75,12 +75,12 @@ def create_visualizations(model, results, config):
 
 
 # Main function
-def main():
+def main(root_dir):
     # Set seed for reproducibility
     set_seed(1)
 
     # Call pre-set config
-    config = BaseConfig()
+    config = BaseConfig(root_dir)
 
     # Setup directory for result saving
     config.results_dir = '/content/drive/MyDrive/MotionAwareMICS/results'
