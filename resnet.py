@@ -104,6 +104,30 @@ class ResNet18(nn.Module):
 
         return nn.Sequential(*layers)
 
+    def _process_frame(self, frame, labels, mix_type, mixup_alpha, num_base_classes, gamma):
+        """Process a single frame through the network with mixup"""
+        # Pick the layer to conduct mix-up
+        if "mixup_hidden" in mix_type:
+            layer_mix = random.randint(0, 3)  # 0: Input, 1: First layer, 2: Second layer, 3: Third layer
+        else:
+            layer_mix = None
+
+        out = frame
+
+        # Compute lambda
+        lamb = np.random.beta(mixup_alpha, mixup_alpha) if mixup_alpha > 0 else 1
+        lamb = torch.from_numpy(np.array([lamb]).astype('float32')).cuda()
+
+        # Re-weighting labels for mix-up
+        if labels is not None:
+            target_reweighted = to_one_hot(labels, self.num_classes)
+        else:
+            target_reweighted = None
+
+        # Rest of your original frame processing code...
+
+        return out, target_reweighted, mix_label_mask
+
     def forward(self, x, labels=None, mix_type="vanilla", mixup_alpha=0.5, num_base_classes=-1, gamma=0.5):
         """ forward function for ResNet-18 with Manifold mix-up."""
         # Initialize mix_label_mask
