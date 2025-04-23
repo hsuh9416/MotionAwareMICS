@@ -129,9 +129,12 @@ class ResNet18(nn.Module):
         return out, target_reweighted, mix_label_mask
 
     def forward(self, x, labels=None, mix_type="vanilla", mixup_alpha=0.5, num_base_classes=-1, gamma=0.5):
-        """ forward function for ResNet-18 with Maniford mix-up."""
+        """ forward function for ResNet-18 with Manifold mix-up."""
         # Initialize mix_label_mask
         mix_label_mask = None
+
+        # Check if input is video data (5D tensor)
+        is_video = (len(x.shape) == 5)
 
         # Pick the layer to conduct mix-up
         if "mixup_hidden" in mix_type:
@@ -139,142 +142,152 @@ class ResNet18(nn.Module):
         else:
             layer_mix = None
 
-        new_labels = None
-        out = x
-
-        # 5D
-        is_video = (len(x.shape) == 5)
-
         # Compute lambda = beta distribution with mixup_alpha
         lamb = np.random.beta(mixup_alpha, mixup_alpha) if mixup_alpha > 0 else 1
         lamb = torch.from_numpy(np.array([lamb]).astype('float32')).cuda()
 
         # Re-weighting labels for mix-up
-        new_labels = to_one_hot(labels, self.num_classes)
+        if labels is not None:
+            new_label = to_one_hot(labels, self.num_classes)
+        else:
+            new_label = None
 
-        # Layer mix after Input
+        # Original input
+        out = x
+
+        # Layer mix after Input (for both image and video)
         if layer_mix == 0:
             if is_video:
-                # Mixup for video
+                # Create indices for mixing
                 indices = np.random.permutation(out.size(0))
-                B, C, T, H, W = out.shape
 
-                # Mixup
-                out = lam * out + (1 - lam) * out[indices]
+                # Mix videos by interpolating across batch dimension
+                out = lamb * out + (1 - lamb) * out[indices]
 
-                # label mixing
-                new_labels, mix_label_mask = middle_label_mix_process(
-                    new_labels,
-                    target_reweighted[indices],
-                    num_base_classes,
-                    lam,
-                    gamma
-                )
+                # Create mixed labels
+                if new_label is not None:
+                    new_label, mix_label_mask = middle_label_mix_process(
+                        new_label,
+                        new_label[indices],
+                        num_base_classes,
+                        lamb,
+                        gamma
+                    )
             else:
-                out, new_labels, mix_label_mask = middle_mixup_process(out, new_labels, num_base_classes, lamb, gamma=gamma)
+                # Regular image mixup
+                out, new_label, mix_label_mask = middle_mixup_process(
+                    out, new_label, num_base_classes, lamb, gamma=gamma
+                )
 
         if is_video:
+            # For video data, process each frame separately
             B, C, T, H, W = out.shape
             frame_features = []
 
             for t in range(T):
+                # Extract single frame
                 frame = out[:, :, t]  # [B, C, H, W]
 
-                # First convolutional layer and initial processing
+                # Process through network layers
                 frame = self.conv1(frame)
                 frame = self.bn1(frame)
                 frame = self.relu(frame)
                 frame = self.maxpool(frame)
+
+                # First layer
                 frame = self.layer1(frame)
 
-                # Mixup after Layer 1
-                if layer_mix == 1:
-                    if t == 0:  # Set Mixup only on the first frame
-                        indices = np.random.permutation(frame.size(0))
-                        frame_mixed = lam * frame + (1 - lam) * frame[indices]
-                        if new_labels is not None:
-                            new_labels, mix_label_mask = middle_label_mix_process(
-                                new_labels,
-                                new_labels[indices],
-                                num_base_classes,
-                                lam,
-                                gamma
-                            )
-                        frame = frame_mixed
+                # Mixup after first layer (only apply on first frame)
+                if layer_mix == 1 and t == 0:
+                    indices = np.random.permutation(frame.size(0))
+                    frame = lamb * frame + (1 - lamb) * frame[indices]
 
+                    if new_label is not None:
+                        new_label, mix_label_mask = middle_label_mix_process(
+                            new_label,
+                            new_label[indices],
+                            num_base_classes,
+                            lamb,
+                            gamma
+                        )
+
+                # Second layer
                 frame = self.layer2(frame)
 
-                # Mixup after Layer 2
-                if layer_mix == 2:
-                    if t == 0:  # Set Mixup only on the first frame
-                        indices = np.random.permutation(frame.size(0))
-                        frame_mixed = lam * frame + (1 - lam) * frame[indices]
-                        if new_labels is not None:
-                            new_labels, mix_label_mask = middle_label_mix_process(
-                                new_labels,
-                                new_labels[indices],
-                                num_base_classes,
-                                lam,
-                                gamma
-                            )
-                        frame = frame_mixed
+                # Mixup after second layer (only apply on first frame)
+                if layer_mix == 2 and t == 0:
+                    indices = np.random.permutation(frame.size(0))
+                    frame = lamb * frame + (1 - lamb) * frame[indices]
 
+                    if new_label is not None:
+                        new_label, mix_label_mask = middle_label_mix_process(
+                            new_label,
+                            new_label[indices],
+                            num_base_classes,
+                            lamb,
+                            gamma
+                        )
+
+                # Third layer
                 frame = self.layer3(frame)
 
-                # Mixup after Layer 3
-                if layer_mix == 3:
-                    if t == 0:  # Set Mixup only on the first frame
-                        indices = np.random.permutation(frame.size(0))
-                        frame_mixed = lam * frame + (1 - lam) * frame[indices]
-                        if new_labels is not None:
-                            new_labels, mix_label_mask = middle_label_mix_process(
-                                new_labels,
-                                new_labels[indices],
-                                num_base_classes,
-                                lam,
-                                gamma
-                            )
-                        frame = frame_mixed
+                # Mixup after third layer (only apply on first frame)
+                if layer_mix == 3 and t == 0:
+                    indices = np.random.permutation(frame.size(0))
+                    frame = lamb * frame + (1 - lamb) * frame[indices]
 
+                    if new_label is not None:
+                        new_label, mix_label_mask = middle_label_mix_process(
+                            new_label,
+                            new_label[indices],
+                            num_base_classes,
+                            lamb,
+                            gamma
+                        )
+
+                # Fourth layer
                 frame = self.layer4(frame)
+
+                # Collect processed frame
                 frame_features.append(frame)
 
-            # Combine all frame properties
+            # Stack frame features back to video shape and average over time
             out = torch.stack(frame_features, dim=2)  # [B, C, T, H, W]
-
-            # Calculate average over time dimension
-            out = torch.mean(out, dim=2)  # [B, C, H, W]
-
+            out = torch.mean(out, dim=2)  # [B, C, H, W] - Average over time dimension
         else:
-            # First layer
+            # Process regular image data as before
             out = self.conv1(out)
             out = self.bn1(out)
             out = self.relu(out)
             out = self.maxpool(out)
+
             out = self.layer1(out)
 
-            # Layer mix after First layer
             if layer_mix == 1:
-                out, new_labels, mix_label_mask = middle_mixup_process(out, new_labels, num_base_classes, lamb, gamma=gamma)
+                out, target_reweighted, mix_label_mask = middle_mixup_process(
+                    out, new_label, num_base_classes, lamb, gamma=gamma
+                )
 
-            # Second layer
             out = self.layer2(out)
 
-            # Layer mix after Second layer
             if layer_mix == 2:
-                out, new_labels, mix_label_mask = middle_mixup_process(out, new_labels, num_base_classes, lamb, gamma=gamma)
+                out, target_reweighted, mix_label_mask = middle_mixup_process(
+                    out, new_label, num_base_classes, lamb, gamma=gamma
+                )
 
-            # Third layer
             out = self.layer3(out)
 
-            # Layer mix after Third layer
             if layer_mix == 3:
-                out, new_labels, mix_label_mask = middle_mixup_process(out, new_labels, num_base_classes, lamb, gamma=gamma)
+                out, target_reweighted, mix_label_mask = middle_mixup_process(
+                    out, new_label, num_base_classes, lamb, gamma=gamma
+                )
 
-            # Forth layer
             out = self.layer4(out)
 
-        return out, new_labels, mix_label_mask
+        if labels is not None:
+            return out, new_label, mix_label_mask
+        else:
+            return out
 
 
 class ResNet20(nn.Module):
@@ -324,6 +337,7 @@ class ResNet20(nn.Module):
         mix_label_mask = None
         # Input layer
         out = x
+
 
         """
             # Maniford Mix-up: Mix-up technique used in the paper
