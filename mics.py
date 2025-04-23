@@ -19,7 +19,7 @@ class MICS(nn.Module):
         if args.dataset == 'cifar100':
             self.encoder = resnet20(num_classes=args.num_classes)
         elif args.dataset == 'hmdb51':
-            self.encoder = resnet18(num_classes=args.num_classes)
+            self.encoder = resnet20(num_classes=args.num_classes)
 
         # Initialize motion-aware mixup module if needed
         if args.use_motion and args.dataset == 'hmdb51':
