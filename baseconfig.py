@@ -18,12 +18,12 @@ class BaseConfig:
 
         self.results_dir = f'{root_dir}results' # Results save
         if os.path.exists(self.results_dir):
-            shutil.rmtree(config.results_dir)
+            shutil.rmtree(self.results_dir)
         os.makedirs(config.results_dir, exist_ok=True)
 
         self.visual_dir = f'{root_dir}pictures' # Visual artifacts
         if os.path.exists(self.visual_dir):
-            shutil.rmtree(config.visual_dir)
+            shutil.rmtree(self.visual_dir)
         os.makedirs(self.visual_dir, exist_ok=True)
 
         self.model_dir = f'{root_dir}models/' # Trained model/weights
@@ -54,7 +54,6 @@ class BaseConfig:
         self.base_mode = 'ft_cos'  # Cosine classifier
         self.new_mode = 'avg_cos'  # Average data embedding / Cosine classifier
         # self.start_session = 0
-
 
         # MICS settings - based on Table 4 (Section 4.5) of the paper
         self.st_ratio = 0.01  # session trainable parameter ratio
